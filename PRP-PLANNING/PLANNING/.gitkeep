@@ -1,0 +1,8 @@
+# Project Planning Documents
+# Copy templates from Complex-PRP-Framework/templates/project/ and customize:
+# - BRD_YourProject.md (Business Requirements)
+# - Architecture_YourProject.md (Technical Architecture)
+# - CLAUDE_PROJECT.md (Main project guidance)
+# - CLAUDE_BACKEND.md (Backend-specific guidance)
+# - CLAUDE_FRONTEND.md (Frontend-specific guidance)  
+# - CLAUDE_SHARED.md (Shared code guidance)
