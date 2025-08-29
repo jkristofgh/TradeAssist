@@ -135,7 +135,7 @@ Phase N APIs for Phase N+1:
 ```bash
 # Generate PHASE[N]_REQUIREMENTS.md files for each planned phase
 For each phase 1 through N:
-- Copy templates/prp/TEMPLATE_PHASE_REQUIREMENTS.md to ../PRP-PLANNING/PRPs/PHASE[N]_REQUIREMENTS.md
+- Copy templates/prp/TEMPLATE_PHASE_REQUIREMENTS.md to ../PRP-PLANNING/PHASE[N]_REQUIREMENTS.md
 - Populate phase-specific information
 - Add dependencies from previous phases
 - Define integration requirements for next phases

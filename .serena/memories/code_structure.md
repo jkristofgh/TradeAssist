@@ -7,7 +7,7 @@ TradeAssist/
 ├── PRP-FRAMEWORK/               # Complex PRP Framework templates and tools
 ├── PRP-PLANNING/                # Project planning documents
 │   ├── PLANNING/               # BRD, Architecture, CLAUDE guidelines
-│   └── PRPs/                   # Generated phase requirements (to be created)
+│   └── [Generated Files]       # Phase requirements and completion summaries
 ├── src/                        # Source code (currently minimal)
 │   ├── backend/               # Server-side implementation (.gitkeep only)
 │   ├── frontend/              # Client-side implementation (.gitkeep only)  

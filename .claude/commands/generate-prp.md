@@ -9,9 +9,9 @@ The AI agent only gets the context you are appending to the PRP and training dat
 ## Research Process
 
 1. **Phase Context Analysis**
-   - Read ../PRP-PLANNING/PRPs/PHASE[N]_REQUIREMENTS.md to determine phase number and complexity
-   - Read ../PRP-PLANNING/PRPs/PROJECT_PHASE_PLAN.md to get template assignment and project context
-   - Read previous ../PRP-PLANNING/PRPs/PHASE[N-1]_COMPLETION_SUMMARY.md files (if any) for integration context
+   - Read ../PRP-PLANNING/PHASE[N]_REQUIREMENTS.md to determine phase number and complexity
+   - Read ../PRP-PLANNING/PROJECT_PHASE_PLAN.md to get template assignment and project context
+   - Read previous ../PRP-PLANNING/PHASE[N-1]_COMPLETION_SUMMARY.md files (if any) for integration context
    - Analyze phase type (foundation/integration/optimization) for appropriate patterns
 
 2. **Template Selection**
@@ -120,7 +120,7 @@ python scripts/document_performance_baselines.py --phase=[N]
 7. **FINAL**: Include phase-appropriate validation loops
 
 ## Output
-Save as: `../PRP-PLANNING/PRPs/{generated-prp-name}.md`
+Save as: `../PRP-PLANNING/{generated-prp-name}.md`
 
 ## Quality Checklist
 - [ ] All necessary context included

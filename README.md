@@ -43,9 +43,9 @@ cp templates/project/TEMPLATE_CLAUDE_*.md ../PRP-PLANNING/PLANNING/
 /plan-project-phases ../PRP-PLANNING/PLANNING/BRD_YourProject.md ../PRP-PLANNING/PLANNING/Architecture_YourProject.md
 
 # This creates:
-# ✅ ../PRP-PLANNING/PRPs/PROJECT_PHASE_PLAN.md - Master phase plan with dependencies
-# ✅ ../PRP-PLANNING/PRPs/PHASE_DEPENDENCY_MAP.md - Visual dependency analysis  
-# ✅ ../PRP-PLANNING/PRPs/PHASE1_REQUIREMENTS.md, PHASE2_REQUIREMENTS.md, etc. - All phase files
+# ✅ ../PRP-PLANNING/PROJECT_PHASE_PLAN.md - Master phase plan with dependencies
+# ✅ ../PRP-PLANNING/PHASE_DEPENDENCY_MAP.md - Visual dependency analysis  
+# ✅ ../PRP-PLANNING/PHASE1_REQUIREMENTS.md, PHASE2_REQUIREMENTS.md, etc. - All phase files
 # ✅ Optimal sequencing based on requirements analysis
 ```
 
@@ -55,10 +55,10 @@ cp templates/project/TEMPLATE_CLAUDE_*.md ../PRP-PLANNING/PLANNING/
 # For each phase (1, 2, 3, ...) - run from PRP-FRAMEWORK directory:
 
 # Generate comprehensive implementation PRP
-/generate-prp ../PRP-PLANNING/PRPs/PHASE[N]_REQUIREMENTS.md
+/generate-prp ../PRP-PLANNING/PHASE[N]_REQUIREMENTS.md
 
 # Execute the phase implementation (creates code in ../src/)
-/execute-prp ../PRP-PLANNING/PRPs/[generated-prp-file].md
+/execute-prp ../PRP-PLANNING/[generated-prp-file].md
 
 # Document what was actually built (automated analysis)
 /update-phase-completion [N]
@@ -114,7 +114,7 @@ Complex-PRP-Framework/                    # Main repository
 │   │   ├── BRD_YourProject.md          # Business requirements
 │   │   ├── Architecture_YourProject.md  # Technical architecture
 │   │   └── CLAUDE_*.md                  # Claude Code guidelines
-│   ├── PRPs/                            # Generated planning files
+│   ├── [Generated Files]/               # Phase requirements and completions
 │   │   ├── PROJECT_PHASE_PLAN.md        # Master phase plan
 │   │   └── PHASE[N]_REQUIREMENTS.md    # Individual phase files
 │   └── TASK.md                          # Project task tracking

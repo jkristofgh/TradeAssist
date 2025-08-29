@@ -36,10 +36,10 @@ cp templates/project/TEMPLATE_CLAUDE_*.md ../PRP-PLANNING/PLANNING/
 ### Step 4: Execute Your First Phase
 ```bash
 # Generate implementation PRP (from repository root directory)
-/generate-prp PRP-PLANNING/PRPs/PHASE1_REQUIREMENTS.md
+/generate-prp PRP-PLANNING/PHASE1_REQUIREMENTS.md
 
 # Execute the phase (creates code in src/)
-/execute-prp PRP-PLANNING/PRPs/[generated-prp-file].md
+/execute-prp PRP-PLANNING/[generated-prp-file].md
 
 # Document completion and adapt future phases
 /update-phase-completion 1
@@ -108,8 +108,8 @@ src/
 /plan-project-phases PRP-PLANNING/PLANNING/BRD_YourProject.md PRP-PLANNING/PLANNING/Architecture_YourProject.md
 
 # Repeat for each phase (run from repository root)
-/generate-prp PRP-PLANNING/PRPs/PHASE[N]_REQUIREMENTS.md
-/execute-prp PRP-PLANNING/PRPs/[generated-prp].md
+/generate-prp PRP-PLANNING/PHASE[N]_REQUIREMENTS.md
+/execute-prp PRP-PLANNING/[generated-prp].md
 /update-phase-completion [N]
 /update-phase-plans [N]
 ```

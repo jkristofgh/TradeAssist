@@ -22,10 +22,10 @@ This command enables adaptive phase planning by:
 
 ## Prerequisites Validation
 Before executing this command, validate that:
-- [ ] ../PRP-PLANNING/PRPs/PHASE[N]_COMPLETION_SUMMARY.md exists for the specified phase
+- [ ] ../PRP-PLANNING/PHASE[N]_COMPLETION_SUMMARY.md exists for the specified phase
 - [ ] templates/prp/TEMPLATE_PHASE_REQUIREMENTS.md exists for template updates
-- [ ] Future phase ../PRP-PLANNING/PRPs/PHASE[N+1]_REQUIREMENTS.md files exist to be updated
-- [ ] ../PRP-PLANNING/PRPs/PROJECT_PHASE_PLAN.md exists and is writable
+- [ ] Future phase ../PRP-PLANNING/PHASE[N+1]_REQUIREMENTS.md files exist to be updated
+- [ ] ../PRP-PLANNING/PROJECT_PHASE_PLAN.md exists and is writable
 
 ## Analysis & Adaptation Process
 

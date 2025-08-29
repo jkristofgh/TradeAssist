@@ -16,8 +16,8 @@ Run these commands from the PRP-FRAMEWORK directory:
 /plan-project-phases ../PRP-PLANNING/PLANNING/BRD_TradingPlatform.md ../PRP-PLANNING/PLANNING/Architecture_TradingPlatform.md
 
 # Execute phases (run after phase plan generation)
-/generate-prp ../PRP-PLANNING/PRPs/PHASE1_REQUIREMENTS.md
-/execute-prp ../PRP-PLANNING/PRPs/[generated-prp-file].md
+/generate-prp ../PRP-PLANNING/PHASE1_REQUIREMENTS.md
+/execute-prp ../PRP-PLANNING/[generated-prp-file].md
 /update-phase-completion 1
 ```
 

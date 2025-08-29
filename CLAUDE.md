@@ -52,6 +52,11 @@
 - **Comment non-obvious code** and ensure everything is understandable to a mid-level developer.
 - When writing complex logic, **add an inline `# Reason:` comment** explaining the why, not just the what.
 
+### Code examples ###
+- Use as example the application from ../examples/schwab_package
+- An Unofficial Charles Schwab API Client: https://schwab-py.readthedocs.io/en/latest/index.html
+
+
 ### 🧠 AI Behavior Rules
 - **Never assume missing context. Ask questions if uncertain.**
 - **Never hallucinate libraries or functions** – only use known, verified Python packages.

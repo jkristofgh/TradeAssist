@@ -17,7 +17,7 @@ Generate a comprehensive Phase Completion Summary for the specified phase in the
 - Validate that phase number is provided and is a positive integer
 - Check if this is Phase 1 (foundation) or subsequent phase
 - Verify that previous phase completion summary exists (for phases > 1)
-- Ensure ../PRP-PLANNING/PRPs/PROJECT_PHASE_PLAN.md exists and is writable for progress tracking
+- Ensure ../PRP-PLANNING/PROJECT_PHASE_PLAN.md exists and is writable for progress tracking
 
 ### 2. Codebase Analysis & Documentation Extraction
 
@@ -112,7 +112,7 @@ Generate a comprehensive Phase Completion Summary for the specified phase in the
 #### Copy and Customize Template
 ```bash
 # Create phase-specific completion summary
-cp templates/prp/TEMPLATE_PHASE_COMPLETION.md ../PRP-PLANNING/PRPs/PHASE{N}_COMPLETION_SUMMARY.md
+cp templates/prp/TEMPLATE_PHASE_COMPLETION.md ../PRP-PLANNING/PHASE{N}_COMPLETION_SUMMARY.md
 ```
 
 #### Fill Template Sections with Real Data
@@ -209,7 +209,7 @@ After creating the completion summary, automatically update PROJECT_PHASE_PLAN.m
 ### 1. Update Phase Deliverables Status
 ```bash
 # Mark Phase N deliverables as completed in PROJECT_PHASE_PLAN.md
-- Read ../PRP-PLANNING/PRPs/PROJECT_PHASE_PLAN.md
+- Read ../PRP-PLANNING/PROJECT_PHASE_PLAN.md
 - Find "### Phase [N] Deliverables" section
 - Update checkboxes from `[ ]` to `[x]` for completed deliverables:
   - [x] PHASE[N]_REQUIREMENTS.md (generated)

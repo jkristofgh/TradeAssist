@@ -32,7 +32,7 @@ Before executing this command, validate that:
 - [ ] PROJECT_PHASE_PLAN.md exists and is complete
 - [ ] PHASE_DEPENDENCY_MAP.md exists (from /plan-project-overview)
 - [ ] templates/prp/TEMPLATE_PHASE_REQUIREMENTS.md exists
-- [ ] Write permissions to PRP-PLANNING/PRPs/ directory
+- [ ] Write permissions to PRP-PLANNING/ directory
 - [ ] Phase numbers are valid (exist in PROJECT_PHASE_PLAN.md)
 
 ## Generation Process
