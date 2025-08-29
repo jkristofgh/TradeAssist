@@ -14,6 +14,8 @@ from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.errors import SlackApiError
 
 from ..config import settings
+from .secret_manager import secret_manager
+from .circuit_breaker import circuit_breaker, CircuitBreakerConfig
 
 logger = structlog.get_logger()
 
@@ -140,9 +142,46 @@ class SlackNotifier:
         self.enabled = bool(settings.SLACK_BOT_TOKEN)
         self.client: Optional[AsyncWebClient] = None
         self.default_channel = settings.SLACK_CHANNEL
+        self._initialized = False
         
-        if self.enabled:
-            self.client = AsyncWebClient(token=settings.SLACK_BOT_TOKEN)
+    async def initialize(self) -> None:
+        """Initialize Slack client with secure token from Secret Manager."""
+        if self._initialized:
+            return
+        
+        try:
+            # Try to get token from Secret Manager first
+            slack_token = await secret_manager.get_secret(
+                "slack-bot-token",
+                fallback_env_var="SLACK_BOT_TOKEN"
+            )
+            
+            if slack_token:
+                self.client = AsyncWebClient(token=slack_token)
+                self.enabled = True
+                logger.info("Slack notifier initialized with secure token")
+            else:
+                self.enabled = False
+                logger.warning("Slack token not found, notifications disabled")
+                
+            self._initialized = True
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize Slack client: {e}")
+            self.enabled = False
+            self._initialized = True
+    
+    @circuit_breaker("slack_notifications", config=CircuitBreakerConfig(
+        failure_threshold=3,
+        recovery_timeout=60,
+        request_timeout=15.0
+    ))
+    async def _send_slack_message(self, target_channel: str, formatted_message: Dict[str, Any]) -> Dict[str, Any]:
+        """Send message to Slack with circuit breaker protection."""
+        return await self.client.chat_postMessage(
+            channel=target_channel,
+            **formatted_message
+        )
     
     async def send_alert(
         self,
@@ -163,6 +202,9 @@ class SlackNotifier:
         Returns:
             bool: True if message sent successfully.
         """
+        # Ensure initialization
+        await self.initialize()
+        
         if not self.enabled or not self.client:
             return False
         
@@ -172,11 +214,8 @@ class SlackNotifier:
             # Format message based on priority
             formatted_message = self._format_slack_message(message, priority, additional_data)
             
-            # Send to Slack
-            response = await self.client.chat_postMessage(
-                channel=target_channel,
-                **formatted_message
-            )
+            # Send to Slack with circuit breaker
+            response = await self._send_slack_message(target_channel, formatted_message)
             
             if response["ok"]:
                 logger.debug(f"Slack alert sent to {target_channel}")
@@ -269,6 +308,7 @@ class NotificationService:
     async def initialize(self) -> None:
         """Initialize notification service and all channels."""
         await self.sound_manager.initialize()
+        await self.slack_notifier.initialize()
         logger.info("Notification service initialized")
     
     async def send_alert_notification(

@@ -14,6 +14,8 @@ import structlog
 from schwab_package import SchwabClient, SchwabClientError
 
 from ..config import settings
+from ..services.secret_manager import secret_manager
+from ..services.circuit_breaker import circuit_breaker, CircuitBreakerConfig, circuit_manager
 
 logger = structlog.get_logger()
 
@@ -37,6 +39,15 @@ class TradeAssistSchwabClient:
         self._start_time: Optional[datetime] = None
         self._last_message_time: Optional[datetime] = None
         
+        # Circuit breaker configuration
+        self._circuit_config = CircuitBreakerConfig(
+            failure_threshold=3,
+            recovery_timeout=30,
+            success_threshold=2,
+            request_timeout=10.0,
+            error_percentage=60.0
+        )
+        
         # Token file path
         self.token_file = Path("data") / "schwab_tokens.json"
         self.token_file.parent.mkdir(exist_ok=True)
@@ -46,14 +57,28 @@ class TradeAssistSchwabClient:
     async def initialize(self) -> None:
         """
         Initialize the Schwab client with authentication.
+        Uses Google Cloud Secret Manager for secure credential retrieval.
         
         Raises:
             SchwabClientError: If initialization fails
         """
         try:
+            # Get credentials from Secret Manager with fallback to config
+            credentials = await secret_manager.get_schwab_credentials()
+            
+            api_key = credentials.get("app_key") or settings.SCHWAB_CLIENT_ID
+            app_secret = credentials.get("app_secret") or settings.SCHWAB_CLIENT_SECRET
+            
+            if not api_key or not app_secret:
+                raise SchwabClientError(
+                    "Schwab API credentials not found in Secret Manager or environment variables"
+                )
+            
+            logger.info("Initializing Schwab client with secure credentials")
+            
             self.client = SchwabClient(
-                api_key=settings.SCHWAB_CLIENT_ID,
-                app_secret=settings.SCHWAB_CLIENT_SECRET,
+                api_key=api_key,
+                app_secret=app_secret,
                 callback_url=settings.SCHWAB_REDIRECT_URI,
                 token_file=str(self.token_file),
             )
@@ -82,6 +107,32 @@ class TradeAssistSchwabClient:
         self.data_callback = callback
         logger.debug("Data callback set")
     
+    @circuit_breaker("schwab_streaming")
+    async def _start_streaming_with_circuit_breaker(self, symbols: List[str]) -> bool:
+        """Start streaming with circuit breaker protection (internal method)."""
+        # Create callback wrapper for performance tracking
+        def tracked_callback(symbol: str, data: Dict[str, Any]) -> None:
+            self._message_count += 1
+            self._last_message_time = datetime.utcnow()
+            
+            # Call the registered callback
+            if self.data_callback:
+                self.data_callback(symbol, data)
+        
+        # Start streaming using schwab-package
+        self._start_time = datetime.utcnow()
+        self.is_streaming = True
+        
+        # Stream indefinitely with auto-reconnect
+        await self.client.stream_quotes(
+            symbols=symbols,
+            callback=tracked_callback,
+            duration=None,  # Indefinite
+            auto_reconnect=True
+        )
+        
+        return True
+    
     async def start_streaming(self, symbols: List[str]) -> bool:
         """
         Start real-time streaming for specified symbols.
@@ -104,28 +155,8 @@ class TradeAssistSchwabClient:
         try:
             logger.info(f"Starting streaming for {len(symbols)} symbols: {symbols}")
             
-            # Create callback wrapper for performance tracking
-            def tracked_callback(symbol: str, data: Dict[str, Any]) -> None:
-                self._message_count += 1
-                self._last_message_time = datetime.utcnow()
-                
-                # Call the registered callback
-                if self.data_callback:
-                    self.data_callback(symbol, data)
-            
-            # Start streaming using schwab-package
-            self._start_time = datetime.utcnow()
-            self.is_streaming = True
-            
-            # Stream indefinitely with auto-reconnect
-            await self.client.stream_quotes(
-                symbols=symbols,
-                callback=tracked_callback,
-                duration=None,  # Indefinite
-                auto_reconnect=True
-            )
-            
-            return True
+            # Use circuit breaker for streaming
+            return await self._start_streaming_with_circuit_breaker(symbols)
             
         except Exception as e:
             self.is_streaming = False
@@ -144,6 +175,7 @@ class TradeAssistSchwabClient:
             except Exception as e:
                 logger.error(f"Error stopping streaming: {e}")
     
+    @circuit_breaker("schwab_auth")
     async def authenticate_manual(self) -> None:
         """
         Perform manual OAuth authentication flow.
@@ -212,6 +244,12 @@ class TradeAssistSchwabClient:
         if self._start_time:
             session_duration = datetime.utcnow() - self._start_time
             health["session_duration_seconds"] = int(session_duration.total_seconds())
+        
+        # Add circuit breaker status
+        health["circuit_breakers"] = {
+            "streaming": circuit_manager.get_or_create("schwab_streaming").get_status(),
+            "auth": circuit_manager.get_or_create("schwab_auth").get_status(),
+        }
         
         return health
     

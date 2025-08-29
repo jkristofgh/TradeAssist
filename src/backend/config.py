@@ -87,6 +87,16 @@ class Settings(BaseSettings):
         description="Enable sound alerts"
     )
     
+    # Google Cloud Configuration
+    GCP_PROJECT_ID: str = Field(
+        default="",
+        description="Google Cloud Project ID for Secret Manager"
+    )
+    GOOGLE_APPLICATION_CREDENTIALS: str = Field(
+        default="",
+        description="Path to Google Cloud service account credentials JSON"
+    )
+    
     # Target Instruments for Real-time Streaming
     TARGET_FUTURES: List[str] = Field(
         default=["ES", "NQ", "YM", "CL", "GC"],
