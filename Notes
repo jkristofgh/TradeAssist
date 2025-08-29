@@ -1,0 +1,10 @@
+8/28:
+.claude/commands/plan-project-phases.md was split into two commands:
+    .claude/commands/plan-project-overview.md
+    .claude/commands/generate-phase-requirements.md
+
+Compressed the BRD and the Architecture documents (not the templates)
+
+Simplified the PRP-FRAMEWORK/templates/planning/PHASE_DEPENDENCY_MAP.md
+
+PRP-PLANNING/PLANNING/PRPs folder references

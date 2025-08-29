@@ -53,7 +53,8 @@
 - When writing complex logic, **add an inline `# Reason:` comment** explaining the why, not just the what.
 
 ### Code examples ###
-- Use as example the application from ../examples/schwab_package
+- schwab-package: a python package using schwab-py: ../examples/schwab_package
+- Demo application using schwab-package for basic demos: ../examples/SchwabWebBasic
 - An Unofficial Charles Schwab API Client: https://schwab-py.readthedocs.io/en/latest/index.html
 
 
