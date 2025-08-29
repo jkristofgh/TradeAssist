@@ -16,11 +16,15 @@ from .api.health import router as health_router
 from .api.instruments import router as instruments_router
 from .api.rules import router as rules_router
 from .api.alerts import router as alerts_router
+from .api.analytics import router as analytics_router
 from .config import settings
 from .database.connection import init_database, close_database
 from .services.data_ingestion import DataIngestionService
 from .services.alert_engine import AlertEngine
 from .services.notification import NotificationService
+from .services.analytics_engine import analytics_engine
+from .services.ml_models import ml_service
+from .services.market_data_processor import market_data_processor
 from .websocket.realtime import router as websocket_router
 
 logger = structlog.get_logger()
@@ -42,6 +46,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize notification service
     notification_service = NotificationService()
     await notification_service.initialize()
+    
+    # Initialize Phase 4 analytics services
+    await market_data_processor.initialize()
+    await ml_service.initialize_models()
     
     # Start alert engine
     alert_engine = AlertEngine()
@@ -108,6 +116,7 @@ def create_app() -> FastAPI:
     app.include_router(instruments_router, prefix="/api", tags=["instruments"])
     app.include_router(rules_router, prefix="/api", tags=["rules"])
     app.include_router(alerts_router, prefix="/api", tags=["alerts"])
+    app.include_router(analytics_router, tags=["analytics"])
     
     # Include WebSocket router
     app.include_router(websocket_router, prefix="/ws")

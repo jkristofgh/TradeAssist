@@ -492,3 +492,4 @@ class GoogleCloudSecretManager:
 
 # Global instance
 secret_manager = GoogleCloudSecretManager()
+
