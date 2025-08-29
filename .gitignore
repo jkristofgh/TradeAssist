@@ -46,6 +46,7 @@ MANIFEST
 
 # Virtual environments
 venv/
+.venv/
 env/
 ENV/
 env.bak/
@@ -64,6 +65,29 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Node.js and frontend dependencies
+node_modules/
+src/frontend/node_modules/
+package-lock.json.backup
+yarn.lock.backup
+
+# Frontend build outputs
+src/frontend/build/
+src/frontend/dist/
+
+# Testing and coverage
+coverage/
+.nyc_output/
+.pytest_cache/
+
+# Secret cache and credentials
+.secrets_cache/
+data/
+
+# AI/ML cache files
+.serena/cache/
+.serena/
 
 # Database
 *.db
