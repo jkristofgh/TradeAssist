@@ -434,7 +434,7 @@ const RuleManagement: React.FC<RuleManagementProps> = ({ className = '' }) => {
         <div className="filter-group">
           <label>Status:</label>
           <select 
-            value={filters.active ?? ''} 
+            value={filters.active === undefined ? '' : String(filters.active)} 
             onChange={(e) => setFilters({
               ...filters,
               active: e.target.value === '' ? undefined : e.target.value === 'true'

@@ -283,7 +283,7 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
 
   // Computed values
   const alerts = alertsResponse?.items || [];
-  const totalPages = Math.ceil((alertsResponse?.total || 0) / pagination.per_page);
+  const totalPages = Math.ceil((alertsResponse?.total || 0) / (pagination.per_page || 25));
   
   const filteredStats = useMemo(() => {
     if (!stats) return null;
@@ -344,24 +344,24 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
         <div className="stats-dashboard">
           <div className="stats-grid">
             <div className="stat-card">
-              <div className="stat-value">{stats.total_alerts.toLocaleString()}</div>
-              <div className="stat-label">Total Alerts</div>
+              <div className="stat-value">{stats.total_alerts_this_week?.toLocaleString() || '0'}</div>
+              <div className="stat-label">Total Alerts (Week)</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">{stats.alerts_today.toLocaleString()}</div>
+              <div className="stat-value">{stats.total_alerts_today?.toLocaleString() || '0'}</div>
               <div className="stat-label">Today</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">{stats.alerts_last_hour.toLocaleString()}</div>
-              <div className="stat-label">Last Hour</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value">{formatDuration(stats.avg_evaluation_time_ms)}</div>
+              <div className="stat-value">{stats.avg_evaluation_time_ms ? formatDuration(stats.avg_evaluation_time_ms) : 'N/A'}</div>
               <div className="stat-label">Avg Eval Time</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">{(stats.success_rate_24h * 100).toFixed(1)}%</div>
-              <div className="stat-label">Success Rate</div>
+              <div className="stat-value">{stats.fastest_evaluation_ms || 'N/A'}</div>
+              <div className="stat-label">Fastest</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{stats.slowest_evaluation_ms || 'N/A'}</div>
+              <div className="stat-label">Slowest</div>
             </div>
           </div>
         </div>
@@ -570,12 +570,12 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
             <div className="pagination-container">
               <div className="pagination-info">
                 <span>
-                  Showing {((pagination.page - 1) * pagination.per_page) + 1} to{' '}
-                  {Math.min(pagination.page * pagination.per_page, alertsResponse?.total || 0)} of{' '}
+                  Showing {(((pagination.page || 1) - 1) * (pagination.per_page || 25)) + 1} to{' '}
+                  {Math.min((pagination.page || 1) * (pagination.per_page || 25), alertsResponse?.total || 0)} of{' '}
                   {alertsResponse?.total || 0} alerts
                 </span>
                 <select
-                  value={pagination.per_page}
+                  value={pagination.per_page || 25}
                   onChange={(e) => handlePerPageChange(parseInt(e.target.value))}
                   className="per-page-select"
                 >
@@ -589,33 +589,33 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
               <div className="pagination-controls">
                 <button
                   onClick={() => handlePageChange(1)}
-                  disabled={pagination.page === 1}
+                  disabled={(pagination.page || 1) === 1}
                   className="btn btn-secondary btn-sm"
                 >
                   First
                 </button>
                 <button
-                  onClick={() => handlePageChange(pagination.page - 1)}
-                  disabled={pagination.page === 1}
+                  onClick={() => handlePageChange((pagination.page || 1) - 1)}
+                  disabled={(pagination.page || 1) === 1}
                   className="btn btn-secondary btn-sm"
                 >
                   Previous
                 </button>
                 
                 <span className="page-info">
-                  Page {pagination.page} of {totalPages}
+                  Page {pagination.page || 1} of {totalPages}
                 </span>
                 
                 <button
-                  onClick={() => handlePageChange(pagination.page + 1)}
-                  disabled={pagination.page === totalPages}
+                  onClick={() => handlePageChange((pagination.page || 1) + 1)}
+                  disabled={(pagination.page || 1) === totalPages}
                   className="btn btn-secondary btn-sm"
                 >
                   Next
                 </button>
                 <button
                   onClick={() => handlePageChange(totalPages)}
-                  disabled={pagination.page === totalPages}
+                  disabled={(pagination.page || 1) === totalPages}
                   className="btn btn-secondary btn-sm"
                 >
                   Last

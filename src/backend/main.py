@@ -5,6 +5,7 @@ This is the main application file that initializes the FastAPI service
 with WebSocket support, API routes, and background task management.
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -17,6 +18,7 @@ from .api.instruments import router as instruments_router
 from .api.rules import router as rules_router
 from .api.alerts import router as alerts_router
 from .api.analytics import router as analytics_router
+from .api.auth import router as auth_router
 from .config import settings
 from .database.connection import init_database, close_database
 from .services.data_ingestion import DataIngestionService
@@ -56,10 +58,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     alert_engine.notification_service = notification_service
     await alert_engine.start()
     
-    # Start background data ingestion service
+    # Start background data ingestion service (non-blocking)
     data_service = DataIngestionService()
     data_service.set_alert_engine(alert_engine)
-    await data_service.start()
+    
+    # Start data service in background task to avoid blocking HTTP server startup
+    async def start_data_service():
+        try:
+            await data_service.start()
+            logger.info("Data ingestion service started successfully")
+        except Exception as e:
+            logger.error(f"Data ingestion service failed to start: {e}")
+            logger.info("HTTP server will continue running without live data streaming")
+    
+    # Create background task for data service startup
+    asyncio.create_task(start_data_service())
     
     # Store service instances for access during shutdown
     app.state.data_service = data_service
@@ -73,8 +86,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Shutdown processes
     logger.info("Shutting down TradeAssist application")
     
-    # Stop data ingestion service
-    await app.state.data_service.stop()
+    # Stop data ingestion service (if it was started successfully)
+    try:
+        if hasattr(app.state.data_service, 'is_running') and app.state.data_service.is_running:
+            await app.state.data_service.stop()
+    except Exception as e:
+        logger.warning(f"Error stopping data service: {e}")
     
     # Stop alert engine
     await app.state.alert_engine.stop()
@@ -117,6 +134,7 @@ def create_app() -> FastAPI:
     app.include_router(rules_router, prefix="/api", tags=["rules"])
     app.include_router(alerts_router, prefix="/api", tags=["alerts"])
     app.include_router(analytics_router, tags=["analytics"])
+    app.include_router(auth_router, prefix="/api", tags=["authentication"])
     
     # Include WebSocket router
     app.include_router(websocket_router, prefix="/ws")

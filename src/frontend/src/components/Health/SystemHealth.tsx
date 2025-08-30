@@ -9,7 +9,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient, queryKeys } from '../../services/apiClient';
-import { HealthStatus } from '../../types';
 
 // =============================================================================
 // TYPES
@@ -82,25 +81,14 @@ const getStatusColor = (status: string): string => {
   }
 };
 
-const getHealthScore = (health: HealthStatus): number => {
+const getHealthScore = (health: any): number => {
   let score = 100;
   
-  // Overall system status impact
-  if (health.status === 'degraded') score -= 20;
-  if (health.status === 'unhealthy') score -= 50;
-  
-  // Database impact
-  if (health.database.status === 'disconnected') score -= 30;
-  
-  // Alert engine impact
-  if (health.alert_engine.status === 'stopped') score -= 25;
-  if (health.alert_engine.status === 'error') score -= 35;
-  if (health.alert_engine.avg_evaluation_time_ms > 100) score -= 10;
-  
-  // Schwab API impact
-  if (health.schwab_api.status === 'disconnected') score -= 15;
-  if (health.schwab_api.status === 'error') score -= 20;
-  if (health.schwab_api.error_count_24h > 50) score -= 10;
+  // Overall system status impact based on actual API response
+  if (health.database_status === 'disconnected') score -= 30;
+  if (health.active_instruments === 0) score -= 20;
+  if (health.active_rules === 0) score -= 15;
+  if (health.avg_evaluation_time_ms && health.avg_evaluation_time_ms > 100) score -= 10;
   
   return Math.max(0, Math.min(100, score));
 };
@@ -156,45 +144,24 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ className = '' }) => {
     return [
       {
         name: 'Database',
-        status: health.database.status,
+        status: health.database_status === 'connected' ? 'connected' : 'disconnected',
         details: {
-          'Connection Pool': health.database.connection_pool_size,
-          'Active Connections': health.database.active_connections,
-          'Pool Usage': `${Math.round((health.database.active_connections / health.database.connection_pool_size) * 100)}%`
+          'Total Instruments': health.total_instruments,
+          'Active Instruments': health.active_instruments,
+          'Status': health.database_status
         },
-        lastUpdate: health.timestamp
-      },
-      {
-        name: 'WebSocket Server',
-        status: health.websocket.active_connections > 0 ? 'running' : 'stopped',
-        details: {
-          'Active Connections': health.websocket.active_connections,
-          'Max Connections': health.websocket.max_connections,
-          'Capacity Usage': `${Math.round((health.websocket.active_connections / health.websocket.max_connections) * 100)}%`
-        },
-        lastUpdate: health.timestamp
+        lastUpdate: new Date().toISOString()
       },
       {
         name: 'Alert Engine',
-        status: health.alert_engine.status,
+        status: health.active_rules > 0 ? 'running' : 'stopped',
         details: {
-          'Active Rules': health.alert_engine.rules_active,
-          'Total Rules': health.alert_engine.rules_total,
-          'Avg Eval Time': `${health.alert_engine.avg_evaluation_time_ms.toFixed(1)}ms`,
-          'Alerts Last Hour': health.alert_engine.alerts_fired_last_hour
+          'Active Rules': health.active_rules,
+          'Total Rules': health.total_rules,
+          'Avg Eval Time': health.avg_evaluation_time_ms ? `${health.avg_evaluation_time_ms.toFixed(1)}ms` : 'N/A',
+          'Alerts Today': health.total_alerts_today
         },
-        lastUpdate: health.timestamp
-      },
-      {
-        name: 'Schwab API',
-        status: health.schwab_api.status,
-        details: {
-          'Requests (24h)': health.schwab_api.request_count_24h.toLocaleString(),
-          'Errors (24h)': health.schwab_api.error_count_24h.toLocaleString(),
-          'Error Rate': `${((health.schwab_api.error_count_24h / Math.max(health.schwab_api.request_count_24h, 1)) * 100).toFixed(2)}%`,
-          'Last Success': health.schwab_api.last_successful_request ? formatDateTime(health.schwab_api.last_successful_request) : 'Never'
-        },
-        lastUpdate: health.timestamp
+        lastUpdate: new Date().toISOString()
       }
     ];
   }, [health]);
@@ -204,40 +171,40 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ className = '' }) => {
     
     return [
       {
-        label: 'System Uptime',
-        value: formatUptime(health.uptime_seconds),
-        status: health.uptime_seconds > 86400 ? 'healthy' : 'warning',
-        description: 'Time since system started'
-      },
-      {
         label: 'Health Score',
         value: `${healthScore}%`,
         status: healthScore >= 90 ? 'healthy' : healthScore >= 70 ? 'warning' : 'error',
         description: 'Overall system health composite score'
       },
       {
+        label: 'Database Status',
+        value: health.database_status,
+        status: health.database_status === 'connected' ? 'healthy' : 'error',
+        description: 'Database connection status'
+      },
+      {
+        label: 'Active Instruments',
+        value: health.active_instruments,
+        status: health.active_instruments > 0 ? 'healthy' : 'warning',
+        description: 'Number of active trading instruments'
+      },
+      {
+        label: 'Alert Rules',
+        value: `${health.active_rules} / ${health.total_rules}`,
+        status: health.active_rules > 0 ? 'healthy' : 'warning',
+        description: 'Active alert rules monitoring the market'
+      },
+      {
         label: 'Alert Response Time',
-        value: `${health.alert_engine.avg_evaluation_time_ms.toFixed(1)}ms`,
-        status: health.alert_engine.avg_evaluation_time_ms < 50 ? 'healthy' : health.alert_engine.avg_evaluation_time_ms < 100 ? 'warning' : 'error',
+        value: health.avg_evaluation_time_ms ? `${health.avg_evaluation_time_ms.toFixed(1)}ms` : 'N/A',
+        status: !health.avg_evaluation_time_ms ? 'warning' : health.avg_evaluation_time_ms < 50 ? 'healthy' : health.avg_evaluation_time_ms < 100 ? 'warning' : 'error',
         description: 'Average time to evaluate alert rules'
       },
       {
-        label: 'Database Performance',
-        value: `${Math.round((health.database.active_connections / health.database.connection_pool_size) * 100)}%`,
-        status: health.database.active_connections / health.database.connection_pool_size < 0.8 ? 'healthy' : 'warning',
-        description: 'Database connection pool usage'
-      },
-      {
-        label: 'API Success Rate',
-        value: `${(100 - (health.schwab_api.error_count_24h / Math.max(health.schwab_api.request_count_24h, 1)) * 100).toFixed(1)}%`,
-        status: health.schwab_api.error_count_24h / Math.max(health.schwab_api.request_count_24h, 1) < 0.05 ? 'healthy' : health.schwab_api.error_count_24h / Math.max(health.schwab_api.request_count_24h, 1) < 0.1 ? 'warning' : 'error',
-        description: 'Schwab API request success rate (24h)'
-      },
-      {
-        label: 'Active Alerts',
-        value: health.alert_engine.alerts_fired_last_hour,
-        status: health.alert_engine.alerts_fired_last_hour < 100 ? 'healthy' : health.alert_engine.alerts_fired_last_hour < 500 ? 'warning' : 'error',
-        description: 'Alerts fired in the last hour'
+        label: 'Alerts Today',
+        value: health.total_alerts_today,
+        status: 'healthy',
+        description: 'Total alerts fired today'
       }
     ];
   }, [health, healthScore]);
@@ -282,7 +249,7 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ className = '' }) => {
               System is {overallStatus === 'healthy' ? 'Healthy' : overallStatus === 'warning' ? 'Degraded' : 'Critical'}
             </span>
             <span className="last-updated">
-              Last updated: {health ? formatDateTime(health.timestamp) : 'Unknown'}
+              Last updated: {formatDateTime(new Date().toISOString())}
             </span>
           </div>
         </div>
@@ -379,16 +346,12 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ className = '' }) => {
               <h4>Application</h4>
               <div className="info-item">
                 <span className="info-label">Version:</span>
-                <span className="info-value">{health.version}</span>
+                <span className="info-value">1.0.0</span>
               </div>
               <div className="info-item">
-                <span className="info-label">Uptime:</span>
-                <span className="info-value">{formatUptime(health.uptime_seconds)}</span>
-              </div>
-              <div className="info-item">
-                <span className="info-label">Status:</span>
-                <span className={`info-value status-text status-${health.status}`}>
-                  {health.status.charAt(0).toUpperCase() + health.status.slice(1)}
+                <span className="info-label">Database:</span>
+                <span className={`info-value status-text status-${health.database_status === 'connected' ? 'healthy' : 'error'}`}>
+                  {health.database_status.charAt(0).toUpperCase() + health.database_status.slice(1)}
                 </span>
               </div>
             </div>
@@ -398,36 +361,32 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ className = '' }) => {
               <div className="info-item">
                 <span className="info-label">Alert Rules:</span>
                 <span className="info-value">
-                  {health.alert_engine.rules_active} / {health.alert_engine.rules_total} active
+                  {health.active_rules} / {health.total_rules} active
                 </span>
               </div>
               <div className="info-item">
                 <span className="info-label">Eval Time:</span>
-                <span className="info-value">{health.alert_engine.avg_evaluation_time_ms.toFixed(2)}ms avg</span>
+                <span className="info-value">
+                  {health.avg_evaluation_time_ms ? `${health.avg_evaluation_time_ms.toFixed(2)}ms avg` : 'N/A'}
+                </span>
               </div>
               <div className="info-item">
-                <span className="info-label">Alerts/Hour:</span>
-                <span className="info-value">{health.alert_engine.alerts_fired_last_hour}</span>
+                <span className="info-label">Alerts Today:</span>
+                <span className="info-value">{health.total_alerts_today}</span>
               </div>
             </div>
             
             <div className="info-section">
               <h4>Resources</h4>
               <div className="info-item">
-                <span className="info-label">DB Connections:</span>
+                <span className="info-label">Instruments:</span>
                 <span className="info-value">
-                  {health.database.active_connections} / {health.database.connection_pool_size}
+                  {health.active_instruments} / {health.total_instruments} active
                 </span>
               </div>
               <div className="info-item">
-                <span className="info-label">WebSocket:</span>
-                <span className="info-value">
-                  {health.websocket.active_connections} / {health.websocket.max_connections} connections
-                </span>
-              </div>
-              <div className="info-item">
-                <span className="info-label">API Requests:</span>
-                <span className="info-value">{health.schwab_api.request_count_24h.toLocaleString()}/24h</span>
+                <span className="info-label">Data Ticks:</span>
+                <span className="info-value">{health.total_ticks_today.toLocaleString()} today</span>
               </div>
             </div>
           </div>

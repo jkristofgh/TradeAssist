@@ -7,9 +7,9 @@ with environment variable support and validation.
 
 from enum import Enum
 from pathlib import Path
-from typing import List
+from typing import List, Union
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -97,24 +97,53 @@ class Settings(BaseSettings):
         description="Path to Google Cloud service account credentials JSON"
     )
     
-    # Target Instruments for Real-time Streaming
-    TARGET_FUTURES: List[str] = Field(
-        default=["ES", "NQ", "YM", "CL", "GC"],
-        description="Futures symbols for real-time streaming"
-    )
-    TARGET_INDICES: List[str] = Field(
-        default=["SPX", "NDX", "RUT"],
-        description="Index symbols for real-time streaming"
-    )
-    TARGET_INTERNALS: List[str] = Field(
-        default=["VIX", "TICK", "ADD", "TRIN"],
-        description="Market internals symbols for real-time streaming"
+    # Demo mode for testing
+    DEMO_MODE: bool = Field(
+        default=False,
+        description="Run in demo mode without real API connections"
     )
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = True
+    # Target Instruments for Real-time Streaming (as strings from env)
+    TARGET_FUTURES_STR: str = Field(
+        default="ES,NQ,YM,CL,GC",
+        description="Futures symbols for real-time streaming (comma-separated)"
+    )
+    TARGET_INDICES_STR: str = Field(
+        default="SPX,NDX,RUT",
+        description="Index symbols for real-time streaming (comma-separated)"
+    )
+    TARGET_INTERNALS_STR: str = Field(
+        default="VIX,TICK,ADD,TRIN",
+        description="Market internals symbols for real-time streaming (comma-separated)"
+    )
+    
+    @property
+    def TARGET_FUTURES(self) -> List[str]:
+        """Get futures symbols as list."""
+        if not self.TARGET_FUTURES_STR.strip():
+            return []
+        return [item.strip() for item in self.TARGET_FUTURES_STR.split(',') if item.strip()]
+    
+    @property
+    def TARGET_INDICES(self) -> List[str]:
+        """Get index symbols as list."""
+        if not self.TARGET_INDICES_STR.strip():
+            return []
+        return [item.strip() for item in self.TARGET_INDICES_STR.split(',') if item.strip()]
+    
+    @property
+    def TARGET_INTERNALS(self) -> List[str]:
+        """Get market internals symbols as list."""
+        if not self.TARGET_INTERNALS_STR.strip():
+            return []
+        return [item.strip() for item in self.TARGET_INTERNALS_STR.split(',') if item.strip()]
+    
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": True,
+        "extra": "ignore"
+    }
 
 
 # Global settings instance

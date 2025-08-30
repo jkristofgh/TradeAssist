@@ -26,27 +26,11 @@
     - 1 edge case
     - 1 failure case
 
-### 🔄 Test-Driven Development Workflow
-- **Write tests first** before implementing new features or fixing bugs
-- **Confirm tests fail** initially (red phase) - ensures test is actually testing something
-- **Implement minimum code** to make tests pass (green phase) - focused implementation
-- **Refactor and improve** while keeping tests passing (refactor phase) - clean code
-- **Use clear iteration targets** - tests provide concrete success criteria for Claude
-- **Test complex logic thoroughly** - edge cases and error conditions are critical
-
 ### ✅ Task Completion
 - **Use TodoWrite tool for task tracking** during active development conversations.
 - **Mark tasks completed immediately** after finishing them using TodoWrite status updates.
 - **Create TASK.md file** if long-term task tracking is needed beyond conversation scope.
 - **Add discovered work** to the current todo list or create follow-up tasks as needed.
-
-### 🧠 Context Management
-- **Use `/clear`** when switching between unrelated tasks or starting fresh conversations
-- **Keep conversations focused** on single objectives to maintain clarity and efficiency
-- **Use plan mode** for complex multi-step implementations requiring approval
-- **Break large tasks** into focused conversation sessions to prevent context overflow
-- **Document context** in commit messages and CLAUDE.md for future reference
-- **Monitor background processes** using BashOutput when services are running
 
 ### 📋 Documentation Maintenance Workflow
 - **Before starting any new feature or significant change:**
@@ -103,14 +87,6 @@
 - **Comment non-obvious code** and ensure everything is understandable to a mid-level developer
 - When writing complex logic, **add an inline `# Reason:` comment** explaining the why, not just the what
 
-### 🎨 Visual Development Workflow
-- **Take screenshots** of UI components for implementation reference and debugging
-- **Use visual mockups** as clear iteration targets for frontend development work
-- **Implement to match** visual specifications exactly - pixel-perfect when possible
-- **Test visual output** against screenshots during development iterations
-- **Document UI patterns** in USER_GUIDE.md for consistency across components
-- **Use browser developer tools** for real-time CSS debugging and optimization
-
 ### 📖 Documentation Files Structure
 - **README_TRADEASSIST.md** - Main project documentation (features, tech stack, quick start)
 - **DEPLOYMENT.md** - Complete deployment and setup guide  
@@ -124,21 +100,6 @@
 - Demo application using schwab-package for basic demos: ../examples/SchwabWebBasic
 - An Unofficial Charles Schwab API Client: https://schwab-py.readthedocs.io/en/latest/index.html
 
-### 🤖 Subagent Strategy
-- **Use general-purpose agent** for complex searches, multi-step analysis, and open-ended research
-- **Use specialized agents** when available for specific domains (e.g., statusline-setup, output-style-setup)
-- **Batch subagent calls** for efficiency when possible to minimize context switching
-- **Provide detailed context** in subagent prompts for better, more targeted results
-- **Review subagent outputs** carefully before implementation - they're not infallible
-- **Launch multiple agents concurrently** when working on independent tasks for optimal performance
-
-### ⚡ Workflow Commands Reference
-- **`/clear`** - Reset context for new tasks or when switching between unrelated work
-- **`/permissions`** - Review and adjust tool permissions for security and efficiency
-- **Plan mode** - Use for complex multi-step implementations requiring user approval
-- **TodoWrite tool** - Use for task tracking and progress management during conversations
-- **BashOutput tool** - Monitor background processes when uvicorn/npm services are running
-- **Bash with parallel commands** - Use multiple tool calls in single message for concurrent execution
 
 ### 🧠 AI Behavior Rules
 - **Never assume missing context. Ask questions if uncertain.**

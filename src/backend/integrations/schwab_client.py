@@ -63,6 +63,12 @@ class TradeAssistSchwabClient:
             SchwabClientError: If initialization fails
         """
         try:
+            # Check if running in demo mode
+            if settings.DEMO_MODE or settings.SCHWAB_CLIENT_ID == "demo_mode":
+                logger.info("Running in demo mode - Schwab client will simulate data")
+                self.is_connected = True
+                return
+            
             # Get credentials from Secret Manager with fallback to config
             credentials = await secret_manager.get_schwab_credentials()
             
@@ -85,10 +91,11 @@ class TradeAssistSchwabClient:
             
             # Perform health check
             health = self.client.health_check()
-            if health["status"] != "healthy":
-                logger.warning(f"Schwab client health issues: {health['issues']}")
-                if health["status"] == "error":
-                    raise SchwabClientError(f"Client unhealthy: {health['issues']}")
+            if health.get("status") != "healthy":
+                issues = health.get('issues', 'Unknown issues')
+                logger.warning(f"Schwab client health issues: {issues}")
+                if health.get("status") == "error":
+                    raise SchwabClientError(f"Client unhealthy: {issues}")
             
             self.is_connected = True
             logger.info("Schwab client initialized successfully")
@@ -146,6 +153,12 @@ class TradeAssistSchwabClient:
         Raises:
             SchwabClientError: If streaming fails to start
         """
+        # Handle demo mode
+        if settings.DEMO_MODE or settings.SCHWAB_CLIENT_ID == "demo_mode":
+            logger.info(f"Demo mode: Simulating streaming for {len(symbols)} symbols: {symbols}")
+            self.is_streaming = True
+            return True
+            
         if not self.client:
             raise SchwabClientError("Client not initialized")
             

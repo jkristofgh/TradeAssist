@@ -11,6 +11,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func, desc
+from sqlalchemy.orm import selectinload
 
 from ..database.connection import get_db_session
 from ..models.alert_logs import AlertLog, AlertStatus, DeliveryStatus
@@ -59,14 +60,14 @@ class AlertStatsResponse(BaseModel):
 
 @router.get("/alerts", response_model=AlertsResponse)
 async def get_alerts(
-    limit: int = Query(50, ge=1, le=1000, description="Number of alerts to return"),
-    offset: int = Query(0, ge=0, description="Offset for pagination"),
+    page: int = Query(1, ge=1, description="Page number for pagination"),
+    per_page: int = Query(50, ge=1, le=1000, description="Number of alerts per page"),
     instrument_id: Optional[int] = Query(None, description="Filter by instrument ID"),
     rule_id: Optional[int] = Query(None, description="Filter by rule ID"),
     fired_status: Optional[AlertStatus] = Query(None, description="Filter by fired status"),
     delivery_status: Optional[DeliveryStatus] = Query(None, description="Filter by delivery status"),
-    date_from: Optional[date] = Query(None, description="Filter alerts from date (YYYY-MM-DD)"),
-    date_to: Optional[date] = Query(None, description="Filter alerts to date (YYYY-MM-DD)"),
+    start_date: Optional[date] = Query(None, description="Filter alerts from date (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, description="Filter alerts to date (YYYY-MM-DD)"),
 ) -> AlertsResponse:
     """
     Get paginated alert history with filtering options.
@@ -75,14 +76,14 @@ async def get_alerts(
     display and historical analysis.
     
     Args:
-        limit: Maximum number of alerts to return (1-1000).
-        offset: Offset for pagination.
+        page: Page number for pagination (1-based).
+        per_page: Number of alerts per page (1-1000).
         instrument_id: Filter by specific instrument.
         rule_id: Filter by specific rule.
         fired_status: Filter by alert firing status.
         delivery_status: Filter by delivery status.
-        date_from: Start date for filtering (inclusive).
-        date_to: End date for filtering (inclusive).
+        start_date: Start date for filtering (inclusive).
+        end_date: End date for filtering (inclusive).
     
     Returns:
         AlertsResponse: Paginated alerts with metadata.
@@ -112,20 +113,23 @@ async def get_alerts(
         if delivery_status:
             query = query.where(AlertLog.delivery_status == delivery_status)
         
-        if date_from:
-            query = query.where(func.date(AlertLog.timestamp) >= date_from)
+        if start_date:
+            query = query.where(func.date(AlertLog.timestamp) >= start_date)
         
-        if date_to:
-            query = query.where(func.date(AlertLog.timestamp) <= date_to)
+        if end_date:
+            query = query.where(func.date(AlertLog.timestamp) <= end_date)
         
         # Get total count before applying pagination
         count_query = select(func.count()).select_from(query.subquery())
         total_result = await session.execute(count_query)
         total = total_result.scalar() or 0
         
+        # Calculate offset from page number
+        offset = (page - 1) * per_page
+        
         # Apply pagination and ordering
         query = query.order_by(desc(AlertLog.timestamp))
-        query = query.offset(offset).limit(limit)
+        query = query.offset(offset).limit(per_page)
         
         # Execute query
         result = await session.execute(query)
@@ -133,7 +137,6 @@ async def get_alerts(
         
         # Calculate pagination metadata
         has_more = offset + len(alerts) < total
-        page = (offset // limit) + 1
         
         return AlertsResponse(
             alerts=[
@@ -157,7 +160,7 @@ async def get_alerts(
             total=total,
             has_more=has_more,
             page=page,
-            limit=limit,
+            limit=per_page,
         )
 
 
