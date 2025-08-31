@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard/Dashboard';
 import RuleManagement from './components/Rules/RuleManagement';
 import AlertHistory from './components/History/AlertHistory';
 import SystemHealth from './components/Health/SystemHealth';
+import HistoricalDataPage from './components/HistoricalData/HistoricalDataPage';
 
 const App: React.FC = () => {
   const location = useLocation();
@@ -37,6 +38,12 @@ const App: React.FC = () => {
                   History
                 </Link>
                 <Link 
+                  to="/historical-data" 
+                  className={`nav-link ${location.pathname === '/historical-data' ? 'active' : ''}`}
+                >
+                  Historical Data
+                </Link>
+                <Link 
                   to="/health" 
                   className={`nav-link ${location.pathname === '/health' ? 'active' : ''}`}
                 >
@@ -51,6 +58,7 @@ const App: React.FC = () => {
               <Route path="/" element={<Dashboard />} />
               <Route path="/rules" element={<RuleManagement />} />
               <Route path="/history" element={<AlertHistory />} />
+              <Route path="/historical-data" element={<HistoricalDataPage />} />
               <Route path="/health" element={<SystemHealth />} />
             </Routes>
           </main>

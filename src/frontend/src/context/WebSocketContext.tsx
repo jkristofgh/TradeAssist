@@ -154,7 +154,7 @@ interface WebSocketContextValue extends WebSocketContextState {
   sendMessage: (message: object) => void;
 }
 
-const WebSocketContext = createContext<WebSocketContextValue | null>(null);
+export const WebSocketContext = createContext<WebSocketContextValue | null>(null);
 
 // =============================================================================
 // PROVIDER COMPONENT

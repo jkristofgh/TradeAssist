@@ -36,6 +36,12 @@ TradeAssist is your real-time trading alerts system with sub-second latency. Thi
 - **Filtering**: Search and filter alerts by instrument or type
 - **Export**: Download alert history for analysis
 
+#### Historical Data Access
+- **Quick Access**: Instant historical data queries
+- **Chart Integration**: Visual data analysis capabilities
+- **Query Management**: Save and reuse common data requests
+- **Export Options**: CSV and JSON data export
+
 ---
 
 ## 📊 Market Data & Instruments
@@ -168,6 +174,126 @@ SOUND_ALERTS_ENABLED=true
 - **Edit existing rules** with live preview
 - **Duplicate rules** for similar setups
 - **Rule templates** for common patterns
+
+---
+
+## 📊 Historical Data Analysis
+
+TradeAssist provides comprehensive historical market data access with advanced querying capabilities and export functionality.
+
+### Historical Data Page
+
+Access historical data through the **Historical Data** navigation link. The page features two main tabs:
+
+#### New Query Tab
+Create and execute new historical data queries with full parameter control:
+
+**Symbol Selection**
+- **Multiple Symbols**: Query multiple instruments simultaneously (e.g., AAPL, SPY, /ES)
+- **Asset Classes**: Support for stocks, indices, and futures contracts
+- **Symbol Validation**: Real-time validation of symbol formats
+
+**Time Range Configuration**
+- **Preset Ranges**: Today, Yesterday, Last 7/30/90 days, Last Year
+- **Custom Ranges**: Specify exact start and end dates/times
+- **Extended Hours**: Include pre-market and after-hours trading data
+
+**Data Frequency Options**
+- **Intraday**: 1min, 5min, 15min, 30min, 1h, 4h intervals
+- **Daily/Weekly/Monthly**: 1d, 1w, 1M aggregation
+- **Volume Control**: Limit maximum records (1-10,000)
+
+**Futures-Specific Features**
+- **Continuous Series**: Automatic contract rolling for uninterrupted historical series
+- **Roll Policies**: Calendar, Volume, or Open Interest-based roll timing
+- **Contract Months**: Access to specific futures contract expiration months
+
+#### Saved Queries Tab
+Manage and reuse frequently accessed data queries:
+
+**Query Management**
+- **Save Queries**: Store queries with custom names and descriptions
+- **Favorites System**: Mark frequently used queries for quick access
+- **Search & Filter**: Find queries by name, description, or symbols
+- **Execution Tracking**: View query run history and frequency
+
+**Organization Features**
+- **Sort Options**: By creation date, name, last executed, or favorites
+- **Bulk Operations**: Edit, delete, or execute multiple queries
+- **Query Sharing**: Export query definitions for team collaboration
+
+### Data Preview & Analysis
+
+#### Table View
+Comprehensive data display with full control:
+
+**Data Display**
+- **OHLCV Data**: Open, High, Low, Close, Volume for each time period
+- **Additional Metrics**: VWAP, Trade Count, Open Interest (futures)
+- **Quality Scoring**: Data quality indicators and completeness metrics
+- **Sorting**: Click column headers to sort by any data field
+
+**Navigation & Pagination**
+- **Page Size Control**: 10, 25, 50, or 100 records per page
+- **Quick Navigation**: First, Previous, Next, Last page controls
+- **Record Counts**: Total records and current page information
+
+#### Chart View
+Visual data analysis capabilities:
+
+**Chart Types**
+- **Candlestick Charts**: Traditional OHLC visualization
+- **Line Charts**: Simple price movement tracking
+- **Multi-Symbol Charts**: Compare multiple instruments simultaneously
+- **Volume Overlays**: Volume bars with price charts
+
+**Interactive Features**
+- **Zoom & Pan**: Navigate through historical periods
+- **Crosshair**: Precise data point examination
+- **Time Period Selection**: Dynamic chart period adjustment
+
+### Data Export & Sharing
+
+#### Export Formats
+- **CSV Export**: Spreadsheet-compatible comma-separated values
+- **JSON Export**: Structured data for programmatic analysis
+- **Custom Formatting**: Date/time formatting options
+
+#### Export Features
+- **Selective Export**: Choose specific data fields and date ranges
+- **Batch Export**: Export multiple queries simultaneously
+- **File Naming**: Automatic timestamp and symbol-based file naming
+
+### Query Execution & Performance
+
+#### Execution Options
+- **Immediate Execution**: Run queries instantly with form submission
+- **Rerun Capabilities**: Re-execute queries with modified parameters
+- **Background Processing**: Large queries processed asynchronously
+
+#### Performance Features
+- **Caching System**: 15-minute cache for frequently accessed data
+- **Cache Indicators**: Visual feedback when data served from cache
+- **Response Times**: Query execution time display
+- **Rate Limiting**: Automatic throttling to prevent API overload
+
+#### Error Handling
+- **Validation Messages**: Clear error messages for invalid parameters
+- **Connection Status**: Real-time API connectivity indicators
+- **Retry Logic**: Automatic retry for transient failures
+- **Fallback Data**: Demo data when live services unavailable
+
+### Integration Features
+
+#### Real-Time Connection
+- **WebSocket Status**: Live connection indicator
+- **Service Health**: Historical data service status monitoring
+- **Auto-Reconnection**: Automatic reconnection on connection loss
+
+#### API Integration
+- **Rate Limits**: Respectful API usage with built-in throttling
+- **Service Discovery**: Automatic detection of available data sources
+- **Provider Information**: Data source capabilities and limitations
 
 ---
 

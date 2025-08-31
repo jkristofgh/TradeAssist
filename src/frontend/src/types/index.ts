@@ -5,6 +5,9 @@
  * to ensure type safety across the full stack.
  */
 
+// Export historical data types
+export * from './historicalData';
+
 // =============================================================================
 // ENUMS
 // =============================================================================
