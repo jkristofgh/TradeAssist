@@ -4,6 +4,8 @@
  * TypeScript interfaces and types for historical data components and services.
  */
 
+import { MarketDataBar } from '../services/historicalDataService';
+
 // =============================================================================
 // ENUMS
 // =============================================================================
@@ -75,32 +77,8 @@ export interface QueryFormData {
 // DATA INTERFACES
 // =============================================================================
 
-export interface MarketDataBar {
-  symbol: string;
-  timestamp: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-  vwap?: number;
-  trades?: number;
-  openInterest?: number;
-  contractMonth?: string;
-  qualityScore?: number;
-}
-
-export interface HistoricalDataResponse {
-  data: MarketDataBar[];
-  symbols: string[];
-  frequency: string;
-  startDate: string;
-  endDate: string;
-  totalRecords: number;
-  cached: boolean;
-  queryTimeMs: number;
-  source?: string;
-}
+// MarketDataBar, SymbolDataResponse, and HistoricalDataResponse 
+// are now defined in historicalDataService.ts to avoid duplication
 
 // =============================================================================
 // SAVED QUERY INTERFACES
@@ -111,20 +89,22 @@ export interface SavedQuery {
   name: string;
   description?: string;
   symbols: string[];
-  frequency: DataFrequency;
-  filters?: QueryFilters;
-  isFavorite: boolean;
-  createdAt: string;
-  updatedAt: string;
-  lastExecuted?: string;
-  executionCount: number;
+  frequency: string;
+  filters?: Record<string, any>;
+  is_favorite: boolean;
+  created_at: string;
+  updated_at: string;
+  last_executed?: string;
+  execution_count: number;
 }
 
 export interface SaveQueryRequest {
   name: string;
   description?: string;
-  query: HistoricalDataQuery;
-  isFavorite?: boolean;
+  symbols: string[];
+  frequency: string;
+  filters?: Record<string, any>;
+  is_favorite?: boolean;
 }
 
 export interface QueryFilters {

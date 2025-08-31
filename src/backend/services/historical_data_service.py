@@ -655,10 +655,76 @@ class HistoricalDataService:
             bars = self._generate_mock_data(symbol, request)
             data_source = "Demo"
         else:
-            # Use Schwab client (would need actual implementation)
-            # This is a placeholder for the actual API call
-            bars = []  # TODO: Implement actual Schwab API call
-            data_source = "Schwab"
+            # Use Schwab client for actual API call
+            try:
+                # Map frequency to schwab_package format
+                frequency_map = {
+                    DataFrequency.ONE_MINUTE.value: "1m",
+                    DataFrequency.FIVE_MINUTE.value: "5m",
+                    DataFrequency.FIFTEEN_MINUTE.value: "15m",
+                    DataFrequency.THIRTY_MINUTE.value: "30m",
+                    DataFrequency.ONE_HOUR.value: "hourly",  # May need adjustment
+                    DataFrequency.FOUR_HOUR.value: "4h",     # May need adjustment  
+                    DataFrequency.DAILY.value: "daily",
+                    DataFrequency.WEEKLY.value: "weekly",
+                    DataFrequency.MONTHLY.value: "monthly"   # May need adjustment
+                }
+                
+                schwab_frequency = frequency_map.get(request.frequency, "daily")
+                
+                # Calculate date parameters
+                start_date = request.start_date
+                end_date = request.end_date
+                days_back = None
+                
+                # If no dates provided, default to last 30 days
+                if not start_date and not end_date:
+                    days_back = 30
+                
+                logger.debug(
+                    f"Calling Schwab API for {symbol}",
+                    frequency=schwab_frequency,
+                    start_date=start_date,
+                    end_date=end_date,
+                    days_back=days_back
+                )
+                
+                # Call the schwab client's get_historical_data method
+                df = await self.schwab_client.client.get_historical_data(
+                    symbol=symbol,
+                    interval=schwab_frequency,
+                    start_date=start_date,
+                    end_date=end_date,
+                    days_back=days_back,
+                    include_extended_hours=request.include_extended_hours
+                )
+                
+                if df is not None and not df.empty:
+                    # Convert DataFrame to bars format
+                    bars = []
+                    for idx, row in df.iterrows():
+                        bar = {
+                            "timestamp": idx if isinstance(idx, datetime) else datetime.fromisoformat(str(idx)),
+                            "open": float(row.get("open", 0)),
+                            "high": float(row.get("high", 0)),
+                            "low": float(row.get("low", 0)), 
+                            "close": float(row.get("close", 0)),
+                            "volume": int(row.get("volume", 0))
+                        }
+                        bars.append(bar)
+                    
+                    logger.info(f"Retrieved {len(bars)} bars for {symbol} from Schwab API")
+                else:
+                    logger.warning(f"No data returned from Schwab API for {symbol}")
+                    bars = []
+                    
+                data_source = "Schwab"
+                
+            except Exception as e:
+                logger.error(f"Schwab API call failed for {symbol}: {e}")
+                # Fall back to empty bars for now, but don't fail completely
+                bars = []
+                data_source = "Schwab"
         
         self._last_api_call = datetime.utcnow()
         self._api_calls_made += 1

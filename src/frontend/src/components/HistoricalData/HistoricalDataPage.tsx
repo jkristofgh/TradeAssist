@@ -15,11 +15,14 @@ import SavedQueries from './SavedQueries';
 import {
   HistoricalDataQuery,
   SavedQuery,
-  MarketDataBar,
   DataFrequency,
   SaveQueryRequest,
   HistoricalDataPageProps
 } from '../../types/historicalData';
+import {
+  MarketDataBar,
+  SymbolDataResponse
+} from '../../services/historicalDataService';
 import './HistoricalDataPage.css';
 
 const HistoricalDataPage: React.FC<HistoricalDataPageProps> = ({ defaultTab = 'new' }) => {
@@ -98,13 +101,39 @@ const HistoricalDataPage: React.FC<HistoricalDataPageProps> = ({ defaultTab = 'n
       };
       
       const response = await historicalDataService.fetchData(request);
-      setData(response.data);
       
-      if (response.cached) {
+      // Extract all bars from all symbols into a flat array for the UI
+      const allBars: MarketDataBar[] = [];
+      response.data.forEach((symbolResult: SymbolDataResponse) => {
+        if (symbolResult.bars && symbolResult.bars.length > 0) {
+          symbolResult.bars.forEach(bar => {
+            allBars.push({
+              symbol: symbolResult.symbol,
+              timestamp: bar.timestamp,
+              open: bar.open,
+              high: bar.high,
+              low: bar.low,
+              close: bar.close,
+              volume: bar.volume,
+              vwap: bar.vwap,
+              trades: bar.trades,
+              openInterest: bar.openInterest,
+              contractMonth: bar.contractMonth,
+              qualityScore: bar.qualityScore
+            });
+          });
+        }
+      });
+      
+      setData(allBars);
+      
+      // Check if any of the symbol results were cached
+      const anyCached = response.data.some(symbolResult => symbolResult.cached);
+      if (anyCached) {
         notificationService.info('Data loaded from cache');
       }
       
-      notificationService.success(`Loaded ${response.total_records} records`);
+      notificationService.success(`Loaded ${allBars.length} records`);
     } catch (error) {
       console.error('Failed to fetch historical data:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch data');
@@ -188,7 +217,7 @@ const HistoricalDataPage: React.FC<HistoricalDataPageProps> = ({ defaultTab = 'n
 
   const handleToggleFavorite = useCallback(async (queryId: number, isFavorite: boolean) => {
     try {
-      await historicalDataService.updateQuery(queryId, { isFavorite });
+      await historicalDataService.updateQuery(queryId, { is_favorite: isFavorite });
       await loadSavedQueries();
     } catch (error) {
       console.error('Failed to update query:', error);

@@ -110,8 +110,8 @@ export const useRealTimeData = (options: UseRealTimeDataOptions = {}): UseRealTi
     if (!systemHealth) return false;
     
     return systemHealth.status === 'healthy' &&
-           systemHealth.database.status === 'connected' &&
-           systemHealth.alert_engine.status === 'running';
+           systemHealth.api_connected &&
+           systemHealth.ingestion_active;
   }, [systemHealth]);
 
   // =============================================================================
@@ -242,13 +242,13 @@ export const useSystemHealthMonitor = () => {
     if (!systemHealth) return null;
 
     return {
-      uptime: Math.floor(systemHealth.uptime_seconds / 60), // minutes
-      activeConnections: systemHealth.websocket.active_connections,
-      maxConnections: systemHealth.websocket.max_connections,
-      avgEvaluationTime: systemHealth.alert_engine.avg_evaluation_time_ms,
-      alertsLastHour: systemHealth.alert_engine.alerts_fired_last_hour,
-      schwabApiStatus: systemHealth.schwab_api.status,
-      databaseConnections: systemHealth.database.active_connections
+      uptime: null, // Not available in Phase 4 structure
+      activeConnections: systemHealth.active_instruments,
+      maxConnections: null, // Not available in Phase 4 structure
+      avgEvaluationTime: null, // Not available in Phase 4 structure
+      alertsLastHour: null, // Not available in Phase 4 structure
+      schwabApiStatus: systemHealth.api_connected ? 'connected' : 'disconnected',
+      databaseConnections: systemHealth.historical_data_service?.service_running ? 1 : 0
     };
   }, [systemHealth]);
 

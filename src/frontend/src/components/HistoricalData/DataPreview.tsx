@@ -7,12 +7,12 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
   DataPreviewProps,
-  MarketDataBar,
   TableColumn,
   TableSortConfig,
   TablePaginationConfig,
   CandlestickData
 } from '../../types/historicalData';
+import { MarketDataBar } from '../../services/historicalDataService';
 import './DataPreview.css';
 
 const DataPreview: React.FC<DataPreviewProps> = ({
@@ -62,35 +62,35 @@ const DataPreview: React.FC<DataPreviewProps> = ({
       key: 'open',
       label: 'Open',
       sortable: true,
-      format: (value: number) => value.toFixed(2),
+      format: (value?: number) => value !== undefined && value !== null ? value.toFixed(2) : '-',
       align: 'right'
     },
     {
       key: 'high',
       label: 'High',
       sortable: true,
-      format: (value: number) => value.toFixed(2),
+      format: (value?: number) => value !== undefined && value !== null ? value.toFixed(2) : '-',
       align: 'right'
     },
     {
       key: 'low',
       label: 'Low',
       sortable: true,
-      format: (value: number) => value.toFixed(2),
+      format: (value?: number) => value !== undefined && value !== null ? value.toFixed(2) : '-',
       align: 'right'
     },
     {
       key: 'close',
       label: 'Close',
       sortable: true,
-      format: (value: number) => value.toFixed(2),
+      format: (value?: number) => value !== undefined && value !== null ? value.toFixed(2) : '-',
       align: 'right'
     },
     {
       key: 'volume',
       label: 'Volume',
       sortable: true,
-      format: (value: number) => value.toLocaleString(),
+      format: (value?: number) => value !== undefined && value !== null ? value.toLocaleString() : '-',
       align: 'right'
     }
   ];
@@ -159,16 +159,24 @@ const DataPreview: React.FC<DataPreviewProps> = ({
       return groups;
     }, {} as Record<string, MarketDataBar[]>);
 
-    return Object.entries(symbolGroups).map(([symbol, bars]) => ({
-      symbol,
-      data: bars.map(bar => ({
-        x: bar.timestamp,
-        o: bar.open,
-        h: bar.high,
-        l: bar.low,
-        c: bar.close
-      } as CandlestickData))
-    }));
+    // Convert to chart data format
+    const result: { symbol: string; data: CandlestickData[] }[] = [];
+    
+    Object.keys(symbolGroups).forEach(symbol => {
+      const bars = symbolGroups[symbol];
+      result.push({
+        symbol,
+        data: bars.map((bar: MarketDataBar) => ({
+          x: bar.timestamp,
+          o: bar.open,
+          h: bar.high,
+          l: bar.low,
+          c: bar.close
+        } as CandlestickData))
+      });
+    });
+    
+    return result;
   }, [data]);
 
   // =============================================================================

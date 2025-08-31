@@ -164,38 +164,29 @@ export interface PaginatedResponse<T> {
 
 export interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
-  timestamp: string;
-  uptime_seconds: number;
-  version: string;
-  database: {
-    status: 'connected' | 'disconnected';
-    connection_pool_size: number;
-    active_connections: number;
-  };
-  websocket: {
-    active_connections: number;
-    max_connections: number;
-  };
-  alert_engine: {
-    status: 'running' | 'stopped' | 'error';
-    rules_active: number;
-    rules_total: number;
-    avg_evaluation_time_ms: number;
-    alerts_fired_last_hour: number;
-  };
-  schwab_api: {
-    status: 'connected' | 'disconnected' | 'error';
-    last_successful_request: string | null;
-    request_count_24h: number;
-    error_count_24h: number;
-  };
+  ingestion_active: boolean;
+  last_tick: string | null;
+  api_connected: boolean;
+  active_instruments: number;
+  total_rules: number;
+  last_alert: string | null;
+  historical_data_service?: {
+    status: 'healthy' | 'degraded' | 'unhealthy';
+    service_running: boolean;
+    schwab_client_connected?: boolean;
+    cache_size?: number;
+    total_requests?: number;
+    database_healthy?: boolean;
+    data_freshness_minutes?: number;
+    error?: string;
+  } | null;
 }
 
 export interface AlertStats {
   total_alerts: number;
   alerts_today: number;
   alerts_last_hour: number;
-  avg_evaluation_time_ms: number;
+  avg_evaluation_time_ms?: number;
   success_rate_24h: number;
   alerts_by_status: Record<AlertStatus, number>;
   alerts_by_delivery_status: Record<DeliveryStatus, number>;
@@ -204,6 +195,11 @@ export interface AlertStats {
     rule_name: string;
     count: number;
   }>;
+  // Additional fields that might be used in SystemHealth
+  total_alerts_this_week?: number;
+  total_alerts_today?: number;
+  fastest_evaluation_ms?: number;
+  slowest_evaluation_ms?: number;
 }
 
 // =============================================================================

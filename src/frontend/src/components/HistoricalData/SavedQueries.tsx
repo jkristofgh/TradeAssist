@@ -43,7 +43,7 @@ const SavedQueries: React.FC<SavedQueriesProps> = ({
     
     // Favorites filter
     if (filterFavorites) {
-      filtered = filtered.filter(query => query.isFavorite);
+      filtered = filtered.filter(query => query.is_favorite);
     }
     
     // Sorting
@@ -52,16 +52,16 @@ const SavedQueries: React.FC<SavedQueriesProps> = ({
         case 'name':
           return a.name.localeCompare(b.name);
         case 'created':
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         case 'lastExecuted':
-          if (!a.lastExecuted) return 1;
-          if (!b.lastExecuted) return -1;
-          return new Date(b.lastExecuted).getTime() - new Date(a.lastExecuted).getTime();
+          if (!a.last_executed) return 1;
+          if (!b.last_executed) return -1;
+          return new Date(b.last_executed).getTime() - new Date(a.last_executed).getTime();
         case 'favorite':
-          if (a.isFavorite === b.isFavorite) {
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          if (a.is_favorite === b.is_favorite) {
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
           }
-          return a.isFavorite ? -1 : 1;
+          return a.is_favorite ? -1 : 1;
         default:
           return 0;
       }
@@ -182,11 +182,11 @@ const SavedQueries: React.FC<SavedQueriesProps> = ({
               <div className="query-header">
                 <h4>{query.name}</h4>
                 <button
-                  className={`favorite-btn ${query.isFavorite ? 'active' : ''}`}
-                  onClick={() => onToggleFavorite(query.id, !query.isFavorite)}
-                  title={query.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                  className={`favorite-btn ${query.is_favorite ? 'active' : ''}`}
+                  onClick={() => onToggleFavorite(query.id, !query.is_favorite)}
+                  title={query.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
                 >
-                  {query.isFavorite ? '★' : '☆'}
+                  {query.is_favorite ? '★' : '☆'}
                 </button>
               </div>
               
@@ -210,20 +210,20 @@ const SavedQueries: React.FC<SavedQueriesProps> = ({
                 
                 <div className="detail-item">
                   <span className="detail-label">Created:</span>
-                  <span className="detail-value">{formatDate(query.createdAt)}</span>
+                  <span className="detail-value">{formatDate(query.created_at)}</span>
                 </div>
                 
-                {query.lastExecuted && (
+                {query.last_executed && (
                   <div className="detail-item">
                     <span className="detail-label">Last Run:</span>
-                    <span className="detail-value">{formatDate(query.lastExecuted)}</span>
+                    <span className="detail-value">{formatDate(query.last_executed)}</span>
                   </div>
                 )}
                 
-                {query.executionCount > 0 && (
+                {query.execution_count > 0 && (
                   <div className="detail-item">
                     <span className="detail-label">Runs:</span>
-                    <span className="detail-value">{query.executionCount}</span>
+                    <span className="detail-value">{query.execution_count}</span>
                   </div>
                 )}
               </div>

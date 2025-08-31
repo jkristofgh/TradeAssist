@@ -72,9 +72,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     
     # Start services in order
     logger.info("Starting core services")
-    await data_ingestion.start()
+    
+    # Try to start data ingestion, but don't fail if streaming fails
+    try:
+        await data_ingestion.start()
+        logger.info("Data ingestion service started successfully")
+    except Exception as e:
+        logger.warning(f"Data ingestion service failed to start (streaming issue): {e}")
+        logger.info("Continuing without real-time streaming - historical data will still work")
+    
     await alert_engine.start()
-    await analytics_engine.start()
     
     logger.info("TradeAssist application started successfully")
     

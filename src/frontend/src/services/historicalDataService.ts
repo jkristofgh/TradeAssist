@@ -46,21 +46,28 @@ export interface MarketDataBar {
   volume: number;
   vwap?: number;
   trades?: number;
-  open_interest?: number;
-  contract_month?: string;
-  quality_score?: number;
+  openInterest?: number;
+  contractMonth?: string;
+  qualityScore?: number;
+}
+
+export interface SymbolDataResponse {
+  symbol: string;
+  frequency: string;
+  start_date: string | null;
+  end_date: string | null;
+  total_bars: number;
+  data_source: string;
+  cached: boolean;
+  bars: MarketDataBar[];
 }
 
 export interface HistoricalDataResponse {
-  data: MarketDataBar[];
-  symbols: string[];
-  frequency: string;
-  start_date: string;
-  end_date: string;
-  total_records: number;
-  cached: boolean;
-  query_time_ms: number;
-  source?: string;
+  success: boolean;
+  message: string;
+  timestamp: string;
+  total_symbols: number;
+  data: SymbolDataResponse[];
 }
 
 export interface SavedQuery {
@@ -139,7 +146,7 @@ class HistoricalDataService {
    */
   async fetchData(request: HistoricalDataRequest): Promise<HistoricalDataResponse> {
     try {
-      const response = await (apiClient as any).post<HistoricalDataResponse>(
+      const response = await (apiClient as any).post(
         `${this.baseEndpoint}/fetch`,
         request
       );
@@ -157,7 +164,7 @@ class HistoricalDataService {
    */
   async getFrequencies(): Promise<string[]> {
     try {
-      const response = await (apiClient as any).get<string[]>(`${this.baseEndpoint}/frequencies`);
+      const response = await (apiClient as any).get(`${this.baseEndpoint}/frequencies`);
       return response;
     } catch (error) {
       if (error instanceof ApiError) {
@@ -172,7 +179,7 @@ class HistoricalDataService {
    */
   async getSources(): Promise<DataSource[]> {
     try {
-      const response = await (apiClient as any).get<DataSource[]>(`${this.baseEndpoint}/sources`);
+      const response = await (apiClient as any).get(`${this.baseEndpoint}/sources`);
       return response;
     } catch (error) {
       if (error instanceof ApiError) {
@@ -191,7 +198,7 @@ class HistoricalDataService {
    */
   async saveQuery(request: SaveQueryRequest): Promise<SavedQuery> {
     try {
-      const response = await (apiClient as any).post<SavedQuery>(
+      const response = await (apiClient as any).post(
         `${this.baseEndpoint}/queries/save`,
         request
       );
@@ -209,7 +216,7 @@ class HistoricalDataService {
    */
   async loadQuery(queryId: number): Promise<SavedQuery> {
     try {
-      const response = await (apiClient as any).get<SavedQuery>(
+      const response = await (apiClient as any).get(
         `${this.baseEndpoint}/queries/${queryId}`
       );
       return response;
@@ -226,7 +233,7 @@ class HistoricalDataService {
    */
   async getSavedQueries(): Promise<SavedQuery[]> {
     try {
-      const response = await (apiClient as any).get<SavedQuery[]>(`${this.baseEndpoint}/queries`);
+      const response = await (apiClient as any).get(`${this.baseEndpoint}/queries`);
       return response;
     } catch (error) {
       if (error instanceof ApiError) {
@@ -241,7 +248,7 @@ class HistoricalDataService {
    */
   async updateQuery(queryId: number, request: Partial<SaveQueryRequest>): Promise<SavedQuery> {
     try {
-      const response = await (apiClient as any).put<SavedQuery>(
+      const response = await (apiClient as any).put(
         `${this.baseEndpoint}/queries/${queryId}`,
         request
       );
@@ -259,7 +266,7 @@ class HistoricalDataService {
    */
   async deleteQuery(queryId: number): Promise<void> {
     try {
-      await (apiClient as any).delete<void>(`${this.baseEndpoint}/queries/${queryId}`);
+      await (apiClient as any).delete(`${this.baseEndpoint}/queries/${queryId}`);
     } catch (error) {
       if (error instanceof ApiError) {
         throw this.handleApiError(error);
@@ -277,7 +284,7 @@ class HistoricalDataService {
    */
   async getStats(): Promise<ServiceStats> {
     try {
-      const response = await (apiClient as any).get<ServiceStats>(`${this.baseEndpoint}/stats`);
+      const response = await (apiClient as any).get(`${this.baseEndpoint}/stats`);
       return response;
     } catch (error) {
       if (error instanceof ApiError) {
@@ -292,7 +299,7 @@ class HistoricalDataService {
    */
   async getHealth(): Promise<ServiceHealth> {
     try {
-      const response = await (apiClient as any).get<ServiceHealth>(`${this.baseEndpoint}/health`);
+      const response = await (apiClient as any).get(`${this.baseEndpoint}/health`);
       return response;
     } catch (error) {
       if (error instanceof ApiError) {

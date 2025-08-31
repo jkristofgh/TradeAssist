@@ -143,23 +143,23 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ className = '' }) => {
     
     return [
       {
-        name: 'Database',
-        status: health.database_status === 'connected' ? 'connected' : 'disconnected',
+        name: 'Data Ingestion',
+        status: health.ingestion_active ? 'running' : 'stopped',
         details: {
-          'Total Instruments': health.total_instruments,
+          'Ingestion Active': health.ingestion_active ? 'Yes' : 'No',
           'Active Instruments': health.active_instruments,
-          'Status': health.database_status
+          'API Connected': health.api_connected ? 'Yes' : 'No',
+          'Last Tick': health.last_tick ? new Date(health.last_tick).toLocaleString() : 'Never'
         },
         lastUpdate: new Date().toISOString()
       },
       {
         name: 'Alert Engine',
-        status: health.active_rules > 0 ? 'running' : 'stopped',
+        status: health.total_rules > 0 ? 'running' : 'stopped',
         details: {
-          'Active Rules': health.active_rules,
           'Total Rules': health.total_rules,
-          'Avg Eval Time': health.avg_evaluation_time_ms ? `${health.avg_evaluation_time_ms.toFixed(1)}ms` : 'N/A',
-          'Alerts Today': health.total_alerts_today
+          'Last Alert': health.last_alert ? new Date(health.last_alert).toLocaleString() : 'None',
+          'System Status': health.status
         },
         lastUpdate: new Date().toISOString()
       }
@@ -177,10 +177,10 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ className = '' }) => {
         description: 'Overall system health composite score'
       },
       {
-        label: 'Database Status',
-        value: health.database_status,
-        status: health.database_status === 'connected' ? 'healthy' : 'error',
-        description: 'Database connection status'
+        label: 'API Connection',
+        value: health.api_connected ? 'Connected' : 'Disconnected',
+        status: health.api_connected ? 'healthy' : 'error',
+        description: 'External API connection status'
       },
       {
         label: 'Active Instruments',
@@ -190,21 +190,21 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ className = '' }) => {
       },
       {
         label: 'Alert Rules',
-        value: `${health.active_rules} / ${health.total_rules}`,
-        status: health.active_rules > 0 ? 'healthy' : 'warning',
-        description: 'Active alert rules monitoring the market'
+        value: health.total_rules,
+        status: health.total_rules > 0 ? 'healthy' : 'warning',
+        description: 'Total alert rules configured'
       },
       {
-        label: 'Alert Response Time',
-        value: health.avg_evaluation_time_ms ? `${health.avg_evaluation_time_ms.toFixed(1)}ms` : 'N/A',
-        status: !health.avg_evaluation_time_ms ? 'warning' : health.avg_evaluation_time_ms < 50 ? 'healthy' : health.avg_evaluation_time_ms < 100 ? 'warning' : 'error',
-        description: 'Average time to evaluate alert rules'
+        label: 'Data Ingestion',
+        value: health.ingestion_active ? 'Active' : 'Stopped',
+        status: health.ingestion_active ? 'healthy' : 'warning',
+        description: 'Market data ingestion status'
       },
       {
-        label: 'Alerts Today',
-        value: health.total_alerts_today,
-        status: 'healthy',
-        description: 'Total alerts fired today'
+        label: 'Last Market Data',
+        value: health.last_tick ? new Date(health.last_tick).toLocaleString() : 'Never',
+        status: health.last_tick ? 'healthy' : 'warning',
+        description: 'Timestamp of last received market data'
       }
     ];
   }, [health, healthScore]);
@@ -349,9 +349,9 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ className = '' }) => {
                 <span className="info-value">1.0.0</span>
               </div>
               <div className="info-item">
-                <span className="info-label">Database:</span>
-                <span className={`info-value status-text status-${health.database_status === 'connected' ? 'healthy' : 'error'}`}>
-                  {health.database_status.charAt(0).toUpperCase() + health.database_status.slice(1)}
+                <span className="info-label">API Connection:</span>
+                <span className={`info-value status-text status-${health.api_connected ? 'healthy' : 'error'}`}>
+                  {health.api_connected ? 'Connected' : 'Disconnected'}
                 </span>
               </div>
             </div>
@@ -361,33 +361,56 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ className = '' }) => {
               <div className="info-item">
                 <span className="info-label">Alert Rules:</span>
                 <span className="info-value">
-                  {health.active_rules} / {health.total_rules} active
+                  {health.total_rules} configured
                 </span>
               </div>
               <div className="info-item">
-                <span className="info-label">Eval Time:</span>
+                <span className="info-label">Data Ingestion:</span>
                 <span className="info-value">
-                  {health.avg_evaluation_time_ms ? `${health.avg_evaluation_time_ms.toFixed(2)}ms avg` : 'N/A'}
+                  {health.ingestion_active ? 'Active' : 'Stopped'}
                 </span>
               </div>
               <div className="info-item">
-                <span className="info-label">Alerts Today:</span>
-                <span className="info-value">{health.total_alerts_today}</span>
+                <span className="info-label">Last Tick:</span>
+                <span className="info-value">{health.last_tick ? new Date(health.last_tick).toLocaleString() : 'Never'}</span>
               </div>
             </div>
             
             <div className="info-section">
-              <h4>Resources</h4>
-              <div className="info-item">
-                <span className="info-label">Instruments:</span>
-                <span className="info-value">
-                  {health.active_instruments} / {health.total_instruments} active
-                </span>
-              </div>
-              <div className="info-item">
-                <span className="info-label">Data Ticks:</span>
-                <span className="info-value">{health.total_ticks_today.toLocaleString()} today</span>
-              </div>
+              <h4>Historical Data Service</h4>
+              {health.historical_data_service ? (
+                <>
+                  <div className="info-item">
+                    <span className="info-label">Status:</span>
+                    <span className={`info-value status-text status-${health.historical_data_service.status}`}>
+                      {health.historical_data_service.status}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Service Running:</span>
+                    <span className="info-value">
+                      {health.historical_data_service.service_running ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  {health.historical_data_service.cache_size && (
+                    <div className="info-item">
+                      <span className="info-label">Cache Size:</span>
+                      <span className="info-value">{health.historical_data_service.cache_size}</span>
+                    </div>
+                  )}
+                  {health.historical_data_service.error && (
+                    <div className="info-item">
+                      <span className="info-label">Error:</span>
+                      <span className="info-value status-text status-error">{health.historical_data_service.error}</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="info-item">
+                  <span className="info-label">Service:</span>
+                  <span className="info-value status-text status-error">Not Available</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
