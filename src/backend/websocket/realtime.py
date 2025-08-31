@@ -388,6 +388,105 @@ class ConnectionManager:
         await self.broadcast(message)
         
         logger.debug(f"Cache performance update: {cache_hit_rate}% hit rate")
+
+    
+    async def broadcast_database_performance(self, performance_data: Dict[str, Any]) -> None:
+        """
+        Broadcast real-time database performance metrics to all connected clients.
+        
+        Args:
+            performance_data: Database performance metrics including connection pool,
+                            INSERT rates, query performance, and partition health.
+        """
+        message = {
+            "type": "database_performance",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "connection_pool": performance_data.get("connection_pool", {}),
+                "performance_metrics": performance_data.get("performance_metrics", {}),
+                "partition_health": performance_data.get("partition_health", {}),
+                "alerts": performance_data.get("alerts", []),
+                "overall_status": performance_data.get("status", "unknown")
+            }
+        }
+        
+        await self.broadcast(message)
+        logger.debug("Broadcasted database performance update", 
+                    active_connections=self.connection_count,
+                    status=performance_data.get("status"))
+    
+    async def broadcast_performance_alert(self, alert_type: str, message: str, 
+                                        severity: str = "warning") -> None:
+        """
+        Broadcast performance-related alerts to connected clients.
+        
+        Args:
+            alert_type: Type of performance alert (connection_pool, slow_query, etc.)
+            message: Alert message description
+            severity: Alert severity level (info, warning, critical)
+        """
+        alert_message = {
+            "type": "performance_alert",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "alert_type": alert_type,
+                "message": message,
+                "severity": severity,
+                "source": "database_performance"
+            }
+        }
+        
+        await self.broadcast(alert_message)
+        logger.info(f"Broadcasted performance alert: {alert_type}", 
+                   message=message, severity=severity)
+    
+    async def broadcast_partition_status_update(self, partition_data: Dict[str, Any]) -> None:
+        """
+        Broadcast partition status updates to connected clients.
+        
+        Args:
+            partition_data: Partition status information including health,
+                          storage utilization, and maintenance status.
+        """
+        message = {
+            "type": "partition_status",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "service_status": partition_data.get("service_status", "unknown"),
+                "partitions": partition_data.get("partitions", {}),
+                "health_summary": partition_data.get("health_summary", {}),
+                "config": partition_data.get("config", {}),
+                "recent_activity": partition_data.get("recent_activity", [])
+            }
+        }
+        
+        await self.broadcast(message)
+        logger.debug("Broadcasted partition status update", 
+                    total_partitions=partition_data.get("health_summary", {}).get("total_partitions", 0))
+    
+    async def broadcast_performance_benchmark_results(self, benchmark_data: Dict[str, Any]) -> None:
+        """
+        Broadcast performance benchmark test results to connected clients.
+        
+        Args:
+            benchmark_data: Performance benchmark results including INSERT rates,
+                          calculation speedup, and capacity validation.
+        """
+        message = {
+            "type": "performance_benchmark",
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": {
+                "insert_performance": benchmark_data.get("insert_performance", {}),
+                "calculation_performance": benchmark_data.get("calculation_performance", {}),
+                "capacity_test": benchmark_data.get("capacity_test", {}),
+                "baseline_comparison": benchmark_data.get("baseline_comparison", {}),
+                "test_status": benchmark_data.get("test_status", "unknown")
+            }
+        }
+        
+        await self.broadcast(message)
+        logger.info("Broadcasted performance benchmark results", 
+                   test_status=benchmark_data.get("test_status"))
     
     async def send_historical_data_stream(
         self,

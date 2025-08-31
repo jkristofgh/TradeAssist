@@ -337,7 +337,7 @@ class AlertEngine:
     @with_db_session
     @handle_db_errors("Evaluation batch processing")
     async def _process_evaluation_batch(self, session, batch_evaluations: List[Dict]) -> None:
-    """
+        """
     Process a batch of alert rule evaluations.
     
     Args:
@@ -412,7 +412,7 @@ class AlertEngine:
     
     @handle_db_errors("Alert firing")
     async def _fire_alert(self, alert_context: AlertContext, session) -> None:
-    """
+        """
     Fire an alert and log the event.
     
     Args:
@@ -507,34 +507,34 @@ class AlertEngine:
     @with_db_session
     @handle_db_errors("Rules cache refresh")
     async def _refresh_rules_cache(self, session) -> None:
-    """
-    Refresh the active rules cache for performance optimization.
-    """
-    # Get all active rules grouped by instrument
-    result = await session.execute(
-        select(AlertRule)
-        .where(AlertRule.active == True)
-        .options(selectinload(AlertRule.instrument))
-        .order_by(AlertRule.instrument_id, AlertRule.created_at)
-    )
-    
-    rules = result.scalars().all()
-    
-    # Group rules by instrument ID
-    rules_by_instrument = {}
-    for rule in rules:
-        if rule.instrument_id not in rules_by_instrument:
-            rules_by_instrument[rule.instrument_id] = []
-        rules_by_instrument[rule.instrument_id].append(rule)
-    
-    self._active_rules_cache = rules_by_instrument
-    self._cache_last_updated = datetime.utcnow()
-    
-    total_rules = sum(len(rules) for rules in rules_by_instrument.values())
-    logger.debug(
-        f"Refreshed rules cache: {total_rules} active rules for "
-        f"{len(rules_by_instrument)} instruments"
-    )
+        """
+        Refresh the active rules cache for performance optimization.
+        """
+        # Get all active rules grouped by instrument
+        result = await session.execute(
+            select(AlertRule)
+            .where(AlertRule.active == True)
+            .options(selectinload(AlertRule.instrument))
+            .order_by(AlertRule.instrument_id, AlertRule.created_at)
+        )
+        
+        rules = result.scalars().all()
+        
+        # Group rules by instrument ID
+        rules_by_instrument = {}
+        for rule in rules:
+            if rule.instrument_id not in rules_by_instrument:
+                rules_by_instrument[rule.instrument_id] = []
+            rules_by_instrument[rule.instrument_id].append(rule)
+        
+        self._active_rules_cache = rules_by_instrument
+        self._cache_last_updated = datetime.utcnow()
+        
+        total_rules = sum(len(rules) for rules in rules_by_instrument.values())
+        logger.debug(
+            f"Refreshed rules cache: {total_rules} active rules for "
+            f"{len(rules_by_instrument)} instruments"
+        )
     
     def _should_refresh_cache(self) -> bool:
         """

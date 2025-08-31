@@ -66,9 +66,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Register historical data service with API
     set_historical_data_service(historical_data_service)
     
+    # Initialize Phase 4 performance monitoring services
+    from .services.performance_monitoring_service import get_performance_monitoring_service
+    from .services.partition_manager_service import get_partition_manager_service
+    
     # Initialize services  
     data_ingestion = DataIngestionService()
     alert_engine = AlertEngine()
+    performance_monitoring = get_performance_monitoring_service()
+    partition_manager = get_partition_manager_service()
     
     # Start services in order
     logger.info("Starting core services")
@@ -83,6 +89,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     
     await alert_engine.start()
     
+    # Start Phase 4 performance services
+    logger.info("Starting Phase 4 performance monitoring services")
+    await partition_manager.start_partition_management()
+    await performance_monitoring.start_monitoring()
+    
     logger.info("TradeAssist application started successfully")
     
     try:
@@ -92,6 +103,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Shutting down TradeAssist application")
         
         # Stop services in reverse order
+        await performance_monitoring.stop_monitoring()
+        await partition_manager.stop_partition_management()
         await analytics_engine.stop()
         await alert_engine.stop()
         await data_ingestion.stop()
