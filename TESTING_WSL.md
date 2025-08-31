@@ -39,9 +39,10 @@ INFO: Uvicorn running on http://127.0.0.1:8000
 Since WSL shares networking with Windows, you can test directly from Windows browsers:
 
 ### Interactive API Documentation
-- **Swagger UI**: http://localhost:8000/docs
+- **Swagger UI**: http://localhost:8000/docs (Enhanced with Phase 4 comprehensive documentation)
 - **ReDoc**: http://localhost:8000/redoc
-- **Health Check**: http://localhost:8000/api/health
+- **Health Check**: http://localhost:8000/api/health (Enhanced with historical data service metrics)
+- **Detailed Health**: http://localhost:8000/api/health/detailed
 
 ### Testing in Swagger UI
 1. Open http://localhost:8000/docs
@@ -81,6 +82,21 @@ curl http://localhost:8000/api/rules
 
 # Get alert history
 curl http://localhost:8000/api/alerts
+
+# Test Historical Data API (Phase 4 Feature)
+curl -X POST http://localhost:8000/api/v1/historical-data/fetch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "symbols": ["AAPL", "SPY"],
+    "frequency": "1d",
+    "max_records": 10
+  }'
+
+# Get supported data frequencies
+curl http://localhost:8000/api/v1/historical-data/frequencies
+
+# Get detailed system health with historical data metrics
+curl http://localhost:8000/api/health/detailed
 ```
 
 ### Method 2: Using HTTPie (Recommended)
@@ -112,6 +128,18 @@ http PUT localhost:8000/api/rules/{rule_id} \
 
 # Delete a rule
 http DELETE localhost:8000/api/rules/{rule_id}
+
+# Test Historical Data API with HTTPie (Phase 4)
+http POST localhost:8000/api/v1/historical-data/fetch \
+  symbols:='["AAPL", "MSFT", "SPY"]' \
+  frequency="1d" \
+  max_records:=20
+
+# Get supported frequencies
+http GET localhost:8000/api/v1/historical-data/frequencies
+
+# Test enhanced health monitoring
+http GET localhost:8000/api/health/detailed
 ```
 
 ### Method 3: Python Requests
@@ -139,6 +167,31 @@ response = requests.post("http://localhost:8000/api/rules", json=rule_data)
 print(f"Rule Creation: {response.status_code}")
 if response.status_code == 201:
     print(f"Created rule: {response.json()}")
+
+# Test Historical Data API (Phase 4)
+historical_request = {
+    "symbols": ["AAPL", "SPY", "TSLA"],
+    "frequency": "1h",
+    "max_records": 50
+}
+
+response = requests.post("http://localhost:8000/api/v1/historical-data/fetch", json=historical_request)
+print(f"Historical Data Request: {response.status_code}")
+if response.status_code == 200:
+    data = response.json()
+    print(f"Retrieved data for {data['total_symbols']} symbols")
+    if data.get('data'):
+        for symbol_data in data['data'][:2]:  # Show first 2 symbols
+            print(f"  {symbol_data['symbol']}: {symbol_data['total_bars']} bars")
+
+# Test enhanced health monitoring
+response = requests.get("http://localhost:8000/api/health/detailed")
+print(f"Detailed Health: {response.status_code}")
+if response.status_code == 200:
+    health = response.json()
+    print(f"  System Status: {health.get('database_status')}")
+    print(f"  Active Instruments: {health.get('active_instruments')}")
+    print(f"  Total Rules: {health.get('total_rules')}")
 ```
 
 ## 🔌 **WebSocket Testing**
@@ -401,15 +454,56 @@ python test_database.py
 
 ## 📊 **System Monitoring & Logging**
 
+### Production Logging Testing (Phase 4)
+
+Test the enhanced production logging infrastructure:
+
+```bash
+# Enable file logging in .env (add these lines)
+echo "LOG_TO_FILE=true" >> .env
+echo "LOG_FILE_PATH=./logs/tradeassist.log" >> .env
+
+# Create logs directory
+mkdir -p logs
+
+# Restart application to enable file logging
+python run.py
+
+# Monitor application logs
+tail -f logs/tradeassist.log
+
+# Test structured logging - look for JSON format in production
+tail -f logs/tradeassist.log | grep "historical_data"
+
+# Monitor specific log events
+tail -f logs/tradeassist.log | grep "event_type.*performance_metric"
+tail -f logs/tradeassist.log | grep "event_type.*historical_data_request"
+tail -f logs/tradeassist.log | grep "event_type.*error"
+
+# Test log rotation (create large log file)
+python -c "
+import logging
+from src.backend.logging_config import configure_production_logging
+configure_production_logging()
+logger = logging.getLogger('test')
+for i in range(10000):
+    logger.info(f'Test log entry {i} with some data to increase file size')
+"
+
+# Check log rotation worked
+ls -la logs/tradeassist.log*
+```
+
 ### Real-time Log Monitoring
 
 ```bash
-# Monitor application logs (if logging to file)
+# Monitor all application logs
 tail -f logs/tradeassist.log
 
-# Monitor specific log levels
+# Monitor specific log levels and events
 tail -f logs/tradeassist.log | grep ERROR
 tail -f logs/tradeassist.log | grep "Alert processed"
+tail -f logs/tradeassist.log | grep "Historical data"
 
 # Monitor system resources
 htop  # Install with: sudo apt install htop
@@ -530,6 +624,12 @@ nvm use 18
 - [ ] DELETE endpoints remove resources
 - [ ] Error handling returns appropriate codes
 - [ ] Request validation works
+- [ ] **Historical Data API (Phase 4)**:
+  - [ ] `/api/v1/historical-data/fetch` accepts valid requests
+  - [ ] `/api/v1/historical-data/frequencies` returns supported frequencies
+  - [ ] Historical data requests validate symbols and parameters
+  - [ ] Cache performance metrics logged
+  - [ ] Error responses include detailed troubleshooting info
 
 ### WebSocket Testing
 - [ ] Connection establishes successfully
@@ -553,6 +653,18 @@ nvm use 18
 - [ ] Memory usage stable
 - [ ] No memory leaks detected
 
+### Production Logging Testing (Phase 4)
+- [ ] **File Logging Configuration**:
+  - [ ] Log files created in `logs/` directory
+  - [ ] File rotation working (10MB max size)
+  - [ ] Backup files created (up to 5 backups)
+  - [ ] JSON structured logging in production mode
+- [ ] **Audit Logging**:
+  - [ ] Historical data requests logged with user context
+  - [ ] Performance metrics captured for API calls
+  - [ ] Error events logged with full context
+  - [ ] Cache hit/miss ratios tracked
+
 ### Security Testing
 - [ ] CORS properly configured
 - [ ] No sensitive data in responses
@@ -569,19 +681,39 @@ nvm use 18
 
 2. **Interactive API Testing**
    - Open http://localhost:8000/docs
-   - Test each endpoint manually
+   - Test core endpoints manually
+   - **Test Phase 4 Historical Data endpoints**
 
-3. **WebSocket Testing**
+3. **Historical Data API Testing** (Phase 4)
+   ```bash
+   # Test historical data fetch
+   curl -X POST http://localhost:8000/api/v1/historical-data/fetch \
+     -H "Content-Type: application/json" \
+     -d '{"symbols": ["AAPL"], "frequency": "1d", "max_records": 10}'
+   
+   # Test supported frequencies
+   curl http://localhost:8000/api/v1/historical-data/frequencies
+   ```
+
+4. **WebSocket Testing**
    ```bash
    wscat -c ws://localhost:8000/ws
    ```
 
-4. **Automated Tests**
+5. **Production Logging Testing** (Phase 4)
+   ```bash
+   # Enable file logging and test
+   echo "LOG_TO_FILE=true" >> .env
+   python run.py
+   tail -f logs/tradeassist.log
+   ```
+
+6. **Automated Tests**
    ```bash
    python -m pytest src/tests/unit/ -v
    ```
 
-5. **Load Testing** (if needed)
+7. **Load Testing** (if needed)
    ```bash
    pip install locust
    # Create locustfile.py for load testing
