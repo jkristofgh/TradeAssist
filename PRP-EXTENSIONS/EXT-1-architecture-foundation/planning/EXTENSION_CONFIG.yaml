@@ -1,0 +1,202 @@
+# Extension Configuration for Architecture Foundation
+extension_name: "Code Architecture Foundation"
+extension_type: "code_refactoring"
+target_project: "TradeAssist"
+extension_version: "1.0.0"
+base_project_version: "Phase 3 Complete"
+
+# Generation metadata
+generated_timestamp: "2025-08-31T09:04:08"
+prp_filename: "extension-prp-architecture-foundation-20250831-090408.md"
+brd_source: "1-architecture-foundation_BRD.md"
+
+# Extension scope
+primary_objectives:
+  - "Decompose HistoricalDataService from 1424 lines to 4 focused classes"
+  - "Replace AnalyticsEngine god method with Strategy Pattern"
+  - "Eliminate 300+ lines of database session boilerplate"
+  - "Achieve 1000+ total lines of code reduction"
+
+target_refactoring:
+  historical_data_service:
+    current_lines: 1424
+    target_classes: 4
+    max_lines_per_class: 350
+  analytics_engine:
+    god_method_lines: 98
+    strategy_classes: 6
+    indicator_types: ["RSI", "MACD", "Bollinger", "MA", "Stochastic", "ATR"]
+  database_decorators:
+    boilerplate_instances: 23
+    lines_per_instance: 15
+    total_elimination: 345
+
+# Implementation phases (generated from comprehensive PRP analysis)
+phases:
+  phase_1:
+    name: "Foundation & Infrastructure"
+    duration: "5 days"
+    complexity: "Low-Medium"
+    risk_level: "LOW"
+    focus: "Database decorators and strategy pattern base classes"
+    dependencies: []
+    deliverables:
+      - "3 core database decorators (@with_db_session, @with_validated_instrument, @handle_db_errors)"
+      - "IndicatorStrategy base class and IndicatorCalculator framework"
+      - "Custom exception classes for database operations"
+      - "Comprehensive unit tests (95% coverage target)"
+      - "Integration tests with existing database operations"
+    success_criteria:
+      - "All decorators work with existing service methods"
+      - "Performance overhead <5% validated"
+      - "Zero impact on existing functionality"
+  phase_2:
+    name: "Analytics Strategy Pattern Implementation"
+    duration: "4 days" 
+    complexity: "Medium"
+    risk_level: "MEDIUM"
+    focus: "Replace 98-line god method with strategy pattern"
+    dependencies: ["Phase 1 - Database decorators and base classes"]
+    deliverables:
+      - "6 indicator strategy classes (RSI, MACD, Bollinger, MA, Stochastic, ATR)"
+      - "IndicatorCalculator strategy context implementation"
+      - "AnalyticsEngine integration with strategy pattern"
+      - "Original god method complete replacement"
+      - "Unit tests for all strategies (92% coverage)"
+    success_criteria:
+      - "Identical calculation results to original implementation"
+      - "Performance target <500ms per indicator met"
+      - "All existing analytics API endpoints unchanged"
+  phase_3:
+    name: "HistoricalDataService Decomposition"
+    duration: "6 days"
+    complexity: "High"
+    risk_level: "HIGH"
+    focus: "Break down 1,424-line service into 4 components"
+    dependencies: ["Phase 1 - Database decorators", "Phase 2 - Pattern validation"]
+    deliverables:
+      - "HistoricalDataFetcher component (~320 lines)"
+      - "HistoricalDataCache component (~280 lines)"
+      - "HistoricalDataQueryManager component (~250 lines)"
+      - "HistoricalDataValidator component (~200 lines)"
+      - "Refactored coordinator service (<500 lines)"
+    success_criteria:
+      - "Service reduced from 1,424 to <500 lines"
+      - "All public APIs maintain identical behavior"
+      - "Performance target <2000ms for typical requests"
+      - "Component integration seamless and tested"
+  phase_4:
+    name: "Service-wide Decorator Integration"
+    duration: "3 days"
+    complexity: "Medium-Low"
+    risk_level: "LOW-MEDIUM" 
+    focus: "Apply decorators across all services, eliminate boilerplate"
+    dependencies: ["Phase 1 - Proven decorators", "Phase 2&3 - Pattern validation"]
+    deliverables:
+      - "Database decorators applied to 23 identified methods"
+      - "345+ lines of boilerplate eliminated"
+      - "All services comply with 500-line rule"
+      - "Service-wide integration testing"
+      - "Performance validation across all services"
+    success_criteria:
+      - "All database boilerplate eliminated"
+      - "No performance degradation measured"
+      - "All integration tests pass"
+
+# Phase-specific technical details
+phase_details:
+  phase_1_infrastructure:
+    decorator_files:
+      - "src/backend/database/decorators.py"
+      - "src/backend/database/exceptions.py"
+    strategy_files:
+      - "src/backend/services/analytics/strategies/base.py"
+      - "src/backend/services/analytics/indicator_calculator.py"
+      - "src/backend/services/analytics/indicator_result.py"
+    test_coverage: 95%
+    performance_overhead_limit: 5%
+    
+  phase_2_strategies:
+    strategy_implementations:
+      - "RSIStrategy (~45 lines)"
+      - "MACDStrategy (~55 lines)" 
+      - "BollingerStrategy (~50 lines)"
+      - "MovingAverageStrategy (~40 lines)"
+      - "StochasticStrategy (~48 lines)"
+      - "ATRStrategy (~42 lines)"
+    integration_file: "src/backend/services/analytics_engine.py"
+    god_method_replacement: "_calculate_indicator (98 lines → strategy delegation)"
+    test_coverage: 92%
+    performance_target: 500
+    
+  phase_3_decomposition:
+    component_breakdown:
+      fetcher: 
+        file: "src/backend/services/historical_data/fetcher.py"
+        target_lines: 320
+        methods_migrated: 8
+      cache:
+        file: "src/backend/services/historical_data/cache.py" 
+        target_lines: 280
+        methods_migrated: 6
+      query_manager:
+        file: "src/backend/services/historical_data/query_manager.py"
+        target_lines: 250
+        methods_migrated: 4
+      validator:
+        file: "src/backend/services/historical_data/validator.py"
+        target_lines: 200
+        methods_migrated: 3
+    coordinator_file: "src/backend/services/historical_data_service.py"
+    original_lines: 1424
+    target_lines: 500
+    performance_target: 2000
+    
+  phase_4_integration:
+    target_services:
+      - name: "AlertEngine"
+        methods: 3
+        lines_eliminated: 24
+      - name: "RiskCalculator" 
+        methods: 4
+        lines_eliminated: 43
+      - name: "DataIngestionService"
+        methods: 5
+        lines_eliminated: 51
+      - name: "MLModelService"
+        methods: 3
+        lines_eliminated: 33
+      - name: "NotificationService"
+        methods: 3
+        lines_eliminated: 30
+      - name: "UserPreferencesService"
+        methods: 2
+        lines_eliminated: 20
+      - name: "PerformanceMonitoringService"
+        methods: 3
+        lines_eliminated: 30
+    total_methods: 23
+    total_lines_eliminated: 345
+    service_size_compliance: "All services <500 lines"
+
+# Success criteria
+success_metrics:
+  code_reduction:
+    target_lines_eliminated: 1000
+    service_size_limit: 500
+    test_coverage_minimum: 90
+  performance:
+    historical_data_max_ms: 2000
+    analytics_max_ms: 500
+    database_ops_max_ms: 100
+  compatibility:
+    breaking_changes_allowed: 0
+    api_endpoint_changes: 0
+    config_changes_required: 0
+
+# Integration readiness
+next_extension_preparation:
+  - "Database performance optimization foundation ready"
+  - "Feature integration architecture prepared"
+  - "Component boundaries established for Extension 2-4"
+  - "Testing framework ready for performance validation"

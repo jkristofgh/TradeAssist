@@ -33,6 +33,7 @@ except ImportError as e:
     TENSORFLOW_AVAILABLE = False
 
 from ..database.connection import get_db_session
+from ..database.decorators import with_db_session, handle_db_errors
 from ..models.market_data import MarketData
 from ..models.instruments import Instrument
 from sqlalchemy import select, and_
@@ -429,55 +430,63 @@ class MLModelsService:
             if not analysis:
                 return None
             
-            # Get raw market data
-            async with get_db_session() as session:
-                cutoff_time = datetime.utcnow() - timedelta(hours=lookback_hours)
-                
-                result = await session.execute(
-                    select(MarketData)
-                    .where(
-                        and_(
-                            MarketData.instrument_id == instrument_id,
-                            MarketData.timestamp >= cutoff_time
-                        )
-                    )
-                    .order_by(MarketData.timestamp)
-                )
-                
-                records = result.scalars().all()
-                
-                if not records:
-                    return None
-                
-                # Convert to DataFrame
-                data = []
-                for record in records:
-                    data.append({
-                        'timestamp': record.timestamp,
-                        'open': float(record.price) if record.price else 0.0,
-                        'high': float(record.price) if record.price else 0.0,
-                        'low': float(record.price) if record.price else 0.0,
-                        'close': float(record.price) if record.price else 0.0,
-                        'volume': record.volume if record.volume else 0
-                    })
-                
-                df = pd.DataFrame(data)
-                if df.empty:
-                    return None
-                
-                df.set_index('timestamp', inplace=True)
-                
-                # Add technical indicators as features
-                await self._add_technical_features(df)
-                
-                # Cache the result
-                self.feature_cache[cache_key] = df
-                
-                return df
-                
+            # Get raw market data from database
+            df = await self._get_market_data_for_prediction(instrument_id, lookback_hours)
+            if df is None or df.empty:
+                return None
+            
+            # Add technical indicators as features
+            await self._add_technical_features(df)
+            
+            # Cache the result
+            self.feature_cache[cache_key] = df
+            
+            return df
+            
         except Exception as e:
             logger.error(f"Error getting prediction features: {e}")
             return None
+
+    @with_db_session
+    @handle_db_errors("Market data retrieval for prediction")
+    async def _get_market_data_for_prediction(self, session, instrument_id: int, lookback_hours: int) -> Optional[pd.DataFrame]:
+    """Get market data from database for ML prediction."""
+    cutoff_time = datetime.utcnow() - timedelta(hours=lookback_hours)
+    
+    result = await session.execute(
+        select(MarketData)
+        .where(
+            and_(
+                MarketData.instrument_id == instrument_id,
+                MarketData.timestamp >= cutoff_time
+            )
+        )
+        .order_by(MarketData.timestamp)
+    )
+    
+    records = result.scalars().all()
+    
+    if not records:
+        return None
+    
+    # Convert to DataFrame
+    data = []
+    for record in records:
+        data.append({
+            'timestamp': record.timestamp,
+            'open': float(record.price) if record.price else 0.0,
+            'high': float(record.price) if record.price else 0.0,
+            'low': float(record.price) if record.price else 0.0,
+            'close': float(record.price) if record.price else 0.0,
+            'volume': record.volume if record.volume else 0
+        })
+    
+    df = pd.DataFrame(data)
+    if df.empty:
+        return None
+    
+    df.set_index('timestamp', inplace=True)
+    return df
     
     async def _add_technical_features(self, df: pd.DataFrame) -> None:
         """Add technical indicators as features to DataFrame."""

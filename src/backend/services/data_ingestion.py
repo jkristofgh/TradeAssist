@@ -14,6 +14,7 @@ from sqlalchemy import select, update
 
 from ..config import settings, get_all_instruments
 from ..database.connection import get_db_session
+from ..database.decorators import with_db_session, handle_db_errors
 from ..integrations.schwab_client import SchwabRealTimeClient, SchwabAPIError
 from ..models.instruments import Instrument, InstrumentStatus
 from ..models.market_data import MarketData
@@ -202,20 +203,21 @@ class DataIngestionService:
         
         logger.info("Data ingestion service stopped")
     
-    async def _load_instruments_mapping(self) -> None:
-        """Load instrument symbol to ID mapping from database."""
-        async with get_db_session() as session:
-            result = await session.execute(
-                select(Instrument.id, Instrument.symbol).where(
-                    Instrument.status == InstrumentStatus.ACTIVE
-                )
-            )
-            
-            self.instruments_map = {
-                symbol: instrument_id for instrument_id, symbol in result.all()
-            }
-            
-            logger.info(f"Loaded {len(self.instruments_map)} instrument mappings")
+    @with_db_session
+    @handle_db_errors("Instruments mapping load")
+    async def _load_instruments_mapping(self, session) -> None:
+    """Load instrument symbol to ID mapping from database."""
+    result = await session.execute(
+        select(Instrument.id, Instrument.symbol).where(
+            Instrument.status == InstrumentStatus.ACTIVE
+        )
+    )
+    
+    self.instruments_map = {
+        symbol: instrument_id for instrument_id, symbol in result.all()
+    }
+    
+    logger.info(f"Loaded {len(self.instruments_map)} instrument mappings")
     
     async def _handle_market_data(self, symbol: str, raw_data: Dict[str, Any]) -> None:
         """
@@ -278,82 +280,75 @@ class DataIngestionService:
                 logger.error(f"Error in data processing loop: {e}")
                 await asyncio.sleep(1)  # Brief pause on error
     
-    async def _process_data_batch(self, batch_data: List[Dict[str, Any]]) -> None:
-        """
-        Process a batch of market data.
+    @with_db_session
+    @handle_db_errors("Data batch processing")
+    async def _process_data_batch(self, session, batch_data: List[Dict[str, Any]]) -> None:
+    """
+    Process a batch of market data.
+    
+    Args:
+        session: Database session.
+        batch_data: List of normalized tick data.
+    """
+    # Create MarketData records
+    market_data_records = []
+    
+    for tick_data in batch_data:
+        symbol = tick_data["symbol"]
+        instrument_id = self.instruments_map.get(symbol)
         
-        Args:
-            batch_data: List of normalized tick data.
-        """
-        async with get_db_session() as session:
-            try:
-                # Create MarketData records
-                market_data_records = []
-                
-                for tick_data in batch_data:
-                    symbol = tick_data["symbol"]
-                    instrument_id = self.instruments_map.get(symbol)
-                    
-                    if not instrument_id:
-                        logger.warning(f"Unknown instrument symbol: {symbol}")
-                        continue
-                    
-                    # Create market data record
-                    market_data = MarketData(
-                        timestamp=tick_data["timestamp"],
-                        instrument_id=instrument_id,
-                        price=tick_data["price"],
-                        volume=tick_data["volume"],
-                        bid=tick_data["bid"],
-                        ask=tick_data["ask"],
-                        bid_size=tick_data["bid_size"],
-                        ask_size=tick_data["ask_size"],
-                        open_price=tick_data["open_price"],
-                        high_price=tick_data["high_price"],
-                        low_price=tick_data["low_price"],
-                    )
-                    
-                    market_data_records.append(market_data)
-                    session.add(market_data)
-                    
-                    # Update instrument last tick info
-                    await session.execute(
-                        update(Instrument)
-                        .where(Instrument.id == instrument_id)
-                        .values(
-                            last_tick=tick_data["timestamp"],
-                            last_price=tick_data["price"]
-                        )
-                    )
-                
-                # Commit batch
-                await session.commit()
-                
-                # Update metrics
-                self.ticks_processed += len(market_data_records)
-                self.last_tick_time = datetime.utcnow()
-                
-                # Broadcast tick updates via WebSocket and trigger alert evaluation
-                for record in market_data_records:
-                    await self.websocket_manager.broadcast_tick_update(
-                        instrument_id=record.instrument_id,
-                        symbol=batch_data[market_data_records.index(record)]["symbol"],
-                        price=float(record.price) if record.price else 0.0,
-                        volume=record.volume or 0,
-                        timestamp=record.timestamp
-                    )
-                    
-                    # Queue alert evaluation for this market data
-                    if self.alert_engine:
-                        await self.alert_engine.queue_evaluation(record.instrument_id, record)
-                
-                if len(market_data_records) > 0:
-                    logger.debug(f"Processed batch of {len(market_data_records)} market data records")
-                
-            except Exception as e:
-                logger.error(f"Error processing data batch: {e}")
-                await session.rollback()
-                self.processing_errors += 1
+        if not instrument_id:
+            logger.warning(f"Unknown instrument symbol: {symbol}")
+            continue
+        
+        # Create market data record
+        market_data = MarketData(
+            timestamp=tick_data["timestamp"],
+            instrument_id=instrument_id,
+            price=tick_data["price"],
+            volume=tick_data["volume"],
+            bid=tick_data["bid"],
+            ask=tick_data["ask"],
+            bid_size=tick_data["bid_size"],
+            ask_size=tick_data["ask_size"],
+            open_price=tick_data["open_price"],
+            high_price=tick_data["high_price"],
+            low_price=tick_data["low_price"],
+        )
+        
+        market_data_records.append(market_data)
+        session.add(market_data)
+        
+        # Update instrument last tick info
+        await session.execute(
+            update(Instrument)
+            .where(Instrument.id == instrument_id)
+            .values(
+                last_tick=tick_data["timestamp"],
+                last_price=tick_data["price"]
+            )
+        )
+    
+    # Update metrics
+    self.ticks_processed += len(market_data_records)
+    self.last_tick_time = datetime.utcnow()
+    
+    # Broadcast tick updates via WebSocket and trigger alert evaluation
+    for record in market_data_records:
+        await self.websocket_manager.broadcast_tick_update(
+            instrument_id=record.instrument_id,
+            symbol=batch_data[market_data_records.index(record)]["symbol"],
+            price=float(record.price) if record.price else 0.0,
+            volume=record.volume or 0,
+            timestamp=record.timestamp
+        )
+        
+        # Queue alert evaluation for this market data
+        if self.alert_engine:
+            await self.alert_engine.queue_evaluation(record.instrument_id, record)
+    
+    if len(market_data_records) > 0:
+        logger.debug(f"Processed batch of {len(market_data_records)} market data records")
     
     async def _connection_monitor(self) -> None:
         """

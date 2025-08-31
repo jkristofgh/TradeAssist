@@ -17,6 +17,7 @@ from sqlalchemy.orm import selectinload
 
 from ..config import settings
 from ..database.connection import get_db_session
+from ..database.decorators import with_db_session, handle_db_errors
 from ..models.instruments import Instrument
 from ..models.market_data import MarketData
 from ..models.alert_rules import AlertRule, RuleType, RuleCondition
@@ -333,45 +334,40 @@ class AlertEngine:
                 logger.error(f"Error in alert evaluation loop: {e}")
                 await asyncio.sleep(0.1)  # Brief pause on error
     
-    async def _process_evaluation_batch(self, batch_evaluations: List[Dict]) -> None:
-        """
-        Process a batch of alert rule evaluations.
+    @with_db_session
+    @handle_db_errors("Evaluation batch processing")
+    async def _process_evaluation_batch(self, session, batch_evaluations: List[Dict]) -> None:
+    """
+    Process a batch of alert rule evaluations.
+    
+    Args:
+        session: Database session.
+        batch_evaluations: List of evaluation data.
+    """
+    alerts_to_fire = []
+    
+    for eval_data in batch_evaluations:
+        instrument_id = eval_data["instrument_id"]
+        market_data = eval_data["market_data"]
         
-        Args:
-            batch_evaluations: List of evaluation data.
-        """
-        async with get_db_session() as session:
-            try:
-                alerts_to_fire = []
-                
-                for eval_data in batch_evaluations:
-                    instrument_id = eval_data["instrument_id"]
-                    market_data = eval_data["market_data"]
-                    
-                    # Get active rules for this instrument
-                    rules = self._active_rules_cache.get(instrument_id, [])
-                    
-                    # Evaluate each rule
-                    for rule in rules:
-                        # Check cooldown period
-                        if rule.is_in_cooldown():
-                            continue
-                        
-                        # Evaluate rule based on type
-                        alert_context = await self._evaluate_rule(rule, market_data, session)
-                        
-                        if alert_context:
-                            alerts_to_fire.append(alert_context)
-                
-                # Fire all triggered alerts
-                for alert_context in alerts_to_fire:
-                    await self._fire_alert(alert_context, session)
-                
-                await session.commit()
-                
-            except Exception as e:
-                logger.error(f"Error processing evaluation batch: {e}")
-                await session.rollback()
+        # Get active rules for this instrument
+        rules = self._active_rules_cache.get(instrument_id, [])
+        
+        # Evaluate each rule
+        for rule in rules:
+            # Check cooldown period
+            if rule.is_in_cooldown():
+                continue
+            
+            # Evaluate rule based on type
+            alert_context = await self._evaluate_rule(rule, market_data, session)
+            
+            if alert_context:
+                alerts_to_fire.append(alert_context)
+    
+    # Fire all triggered alerts
+    for alert_context in alerts_to_fire:
+        await self._fire_alert(alert_context, session)
     
     async def _evaluate_rule(
         self,
@@ -414,68 +410,63 @@ class AlertEngine:
         
         return None
     
+    @handle_db_errors("Alert firing")
     async def _fire_alert(self, alert_context: AlertContext, session) -> None:
-        """
-        Fire an alert and log the event.
-        
-        Args:
-            alert_context: Context data for the alert.
-            session: Database session.
-        """
-        try:
-            rule = alert_context.rule
-            
-            # Create alert log entry
-            alert_log = AlertLog(
-                timestamp=alert_context.timestamp,
-                rule_id=rule.id,
-                instrument_id=rule.instrument_id,
-                trigger_value=alert_context.trigger_value,
-                threshold_value=float(rule.threshold),
-                fired_status=AlertStatus.FIRED,
-                delivery_status=DeliveryStatus.PENDING,
-                evaluation_time_ms=alert_context.evaluation_time_ms,
-                rule_condition=rule.condition.value,
-                alert_message=self._generate_alert_message(alert_context),
-            )
-            
-            session.add(alert_log)
-            
-            # Update rule last triggered time
-            rule.last_triggered = alert_context.timestamp
-            
-            # Update performance metrics
-            self.alerts_fired += 1
-            self.total_evaluation_time_ms += alert_context.evaluation_time_ms
-            self.max_evaluation_time_ms = max(
-                self.max_evaluation_time_ms,
-                alert_context.evaluation_time_ms
-            )
-            
-            # Broadcast alert via WebSocket
-            await self.websocket_manager.broadcast_alert_fired(
-                rule_id=rule.id,
-                instrument_id=rule.instrument_id,
-                symbol=rule.instrument.symbol,  # Assuming instrument is loaded
-                trigger_value=alert_context.trigger_value,
-                threshold_value=float(rule.threshold),
-                condition=rule.condition.value,
-                timestamp=alert_context.timestamp,
-                evaluation_time_ms=alert_context.evaluation_time_ms
-            )
-            
-            logger.info(
-                f"Alert fired for rule {rule.id}: {rule.instrument.symbol} "
-                f"{rule.condition.value} {rule.threshold} (actual: {alert_context.trigger_value})",
-                rule_id=rule.id,
-                instrument_symbol=rule.instrument.symbol,
-                evaluation_time_ms=alert_context.evaluation_time_ms
-            )
-            
-            # TODO: Trigger notification delivery (sound, Slack, etc.)
-            
-        except Exception as e:
-            logger.error(f"Error firing alert for rule {rule.id}: {e}")
+    """
+    Fire an alert and log the event.
+    
+    Args:
+        alert_context: Context data for the alert.
+        session: Database session.
+    """
+    rule = alert_context.rule
+    
+    # Create alert log entry
+    alert_log = AlertLog(
+        timestamp=alert_context.timestamp,
+        rule_id=rule.id,
+        instrument_id=rule.instrument_id,
+        trigger_value=alert_context.trigger_value,
+        threshold_value=float(rule.threshold),
+        fired_status=AlertStatus.FIRED,
+        delivery_status=DeliveryStatus.PENDING,
+        evaluation_time_ms=alert_context.evaluation_time_ms,
+        rule_condition=rule.condition.value,
+        alert_message=self._generate_alert_message(alert_context),
+    )
+    
+    session.add(alert_log)
+    
+    # Update rule last triggered time
+    rule.last_triggered = alert_context.timestamp
+    
+    # Update performance metrics
+    self.alerts_fired += 1
+    self.total_evaluation_time_ms += alert_context.evaluation_time_ms
+    self.max_evaluation_time_ms = max(
+        self.max_evaluation_time_ms,
+        alert_context.evaluation_time_ms
+    )
+    
+    # Broadcast alert via WebSocket
+    await self.websocket_manager.broadcast_alert_fired(
+        rule_id=rule.id,
+        instrument_id=rule.instrument_id,
+        symbol=rule.instrument.symbol,  # Assuming instrument is loaded
+        trigger_value=alert_context.trigger_value,
+        threshold_value=float(rule.threshold),
+        condition=rule.condition.value,
+        timestamp=alert_context.timestamp,
+        evaluation_time_ms=alert_context.evaluation_time_ms
+    )
+    
+    logger.info(
+        f"Alert fired for rule {rule.id}: {rule.instrument.symbol} "
+        f"{rule.condition.value} {rule.threshold} (actual: {alert_context.trigger_value})",
+        rule_id=rule.id,
+        instrument_symbol=rule.instrument.symbol,
+        evaluation_time_ms=alert_context.evaluation_time_ms
+    )
     
     def _generate_alert_message(self, alert_context: AlertContext) -> str:
         """
@@ -513,40 +504,37 @@ class AlertEngine:
         
         return f"{base_msg} - Triggered at {alert_context.timestamp}"
     
-    async def _refresh_rules_cache(self) -> None:
-        """
-        Refresh the active rules cache for performance optimization.
-        """
-        try:
-            async with get_db_session() as session:
-                # Get all active rules grouped by instrument
-                result = await session.execute(
-                    select(AlertRule)
-                    .where(AlertRule.active == True)
-                    .options(selectinload(AlertRule.instrument))
-                    .order_by(AlertRule.instrument_id, AlertRule.created_at)
-                )
-                
-                rules = result.scalars().all()
-                
-                # Group rules by instrument ID
-                rules_by_instrument = {}
-                for rule in rules:
-                    if rule.instrument_id not in rules_by_instrument:
-                        rules_by_instrument[rule.instrument_id] = []
-                    rules_by_instrument[rule.instrument_id].append(rule)
-                
-                self._active_rules_cache = rules_by_instrument
-                self._cache_last_updated = datetime.utcnow()
-                
-                total_rules = sum(len(rules) for rules in rules_by_instrument.values())
-                logger.debug(
-                    f"Refreshed rules cache: {total_rules} active rules for "
-                    f"{len(rules_by_instrument)} instruments"
-                )
-                
-        except Exception as e:
-            logger.error(f"Error refreshing rules cache: {e}")
+    @with_db_session
+    @handle_db_errors("Rules cache refresh")
+    async def _refresh_rules_cache(self, session) -> None:
+    """
+    Refresh the active rules cache for performance optimization.
+    """
+    # Get all active rules grouped by instrument
+    result = await session.execute(
+        select(AlertRule)
+        .where(AlertRule.active == True)
+        .options(selectinload(AlertRule.instrument))
+        .order_by(AlertRule.instrument_id, AlertRule.created_at)
+    )
+    
+    rules = result.scalars().all()
+    
+    # Group rules by instrument ID
+    rules_by_instrument = {}
+    for rule in rules:
+        if rule.instrument_id not in rules_by_instrument:
+            rules_by_instrument[rule.instrument_id] = []
+        rules_by_instrument[rule.instrument_id].append(rule)
+    
+    self._active_rules_cache = rules_by_instrument
+    self._cache_last_updated = datetime.utcnow()
+    
+    total_rules = sum(len(rules) for rules in rules_by_instrument.values())
+    logger.debug(
+        f"Refreshed rules cache: {total_rules} active rules for "
+        f"{len(rules_by_instrument)} instruments"
+    )
     
     def _should_refresh_cache(self) -> bool:
         """
