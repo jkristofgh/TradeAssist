@@ -59,6 +59,50 @@ class Settings(BaseSettings):
         description="OAuth redirect URI"
     )
     
+    # Historical Data Service Configuration
+    HISTORICAL_DATA_CACHE_TTL: int = Field(
+        default=300,  # 5 minutes
+        description="Historical data cache TTL in seconds"
+    )
+    HISTORICAL_DATA_MAX_SYMBOLS_PER_REQUEST: int = Field(
+        default=50,
+        description="Maximum symbols per historical data request"
+    )
+    HISTORICAL_DATA_MAX_RECORDS_DEFAULT: int = Field(
+        default=10000,
+        description="Default maximum records per symbol for historical data requests"
+    )
+    HISTORICAL_DATA_RATE_LIMIT_REQUESTS: int = Field(
+        default=100,
+        description="Historical data API rate limit requests per minute"
+    )
+    HISTORICAL_DATA_BATCH_SIZE: int = Field(
+        default=25,
+        description="Batch size for historical data fetching from Schwab API"
+    )
+    HISTORICAL_DATA_RETRY_ATTEMPTS: int = Field(
+        default=3,
+        description="Number of retry attempts for failed historical data requests"
+    )
+    HISTORICAL_DATA_RETRY_DELAY: int = Field(
+        default=1,
+        description="Delay between retry attempts in seconds"
+    )
+    
+    # Database Connection and Query Settings
+    DATABASE_QUERY_TIMEOUT: int = Field(
+        default=30,
+        description="Database query timeout in seconds"
+    )
+    DATABASE_CONNECTION_POOL_SIZE: int = Field(
+        default=10,
+        description="Database connection pool size"
+    )
+    DATABASE_CONNECTION_OVERFLOW: int = Field(
+        default=20,
+        description="Database connection pool overflow size"
+    )
+    
     # Performance Configuration
     MAX_WEBSOCKET_CONNECTIONS: int = Field(
         default=10,
@@ -71,6 +115,20 @@ class Settings(BaseSettings):
     DATA_INGESTION_BATCH_SIZE: int = Field(
         default=100,
         description="Batch size for data ingestion"
+    )
+    
+    # Cache Configuration (Redis-compatible for future use)
+    CACHE_BACKEND: str = Field(
+        default="memory",
+        description="Cache backend type (memory, redis)"
+    )
+    CACHE_REDIS_URL: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis URL for caching (when cache backend is redis)"
+    )
+    CACHE_DEFAULT_TTL: int = Field(
+        default=300,
+        description="Default cache TTL in seconds"
     )
     
     # Notification Configuration
@@ -95,6 +153,28 @@ class Settings(BaseSettings):
     GOOGLE_APPLICATION_CREDENTIALS: str = Field(
         default="",
         description="Path to Google Cloud service account credentials JSON"
+    )
+    
+    # Production Logging Configuration
+    LOG_TO_FILE: bool = Field(
+        default=False,
+        description="Enable logging to file"
+    )
+    LOG_FILE_PATH: str = Field(
+        default="./logs/tradeassist.log",
+        description="Log file path"
+    )
+    LOG_FILE_MAX_SIZE: int = Field(
+        default=10485760,  # 10MB
+        description="Maximum log file size in bytes"
+    )
+    LOG_FILE_BACKUP_COUNT: int = Field(
+        default=5,
+        description="Number of backup log files to keep"
+    )
+    LOG_FORMAT: str = Field(
+        default="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        description="Log message format"
     )
     
     # Demo mode for testing

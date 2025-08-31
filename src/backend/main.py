@@ -42,7 +42,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     Handles startup and shutdown events for the FastAPI application,
     including database initialization and background service management.
     """
-    logger.info("Starting TradeAssist application")
+    # Configure production logging first
+    from .logging_config import configure_production_logging
+    configure_production_logging()
+    
+    logger.info("Starting TradeAssist application", version="1.0.0", phase="4_production")
     
     # Initialize database
     await init_database()
@@ -59,63 +63,37 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     historical_data_service = HistoricalDataService()
     await historical_data_service.start()
     
-    # Set up historical data API dependency
+    # Register historical data service with API
     set_historical_data_service(historical_data_service)
     
-    # Start alert engine
+    # Initialize services  
+    data_ingestion = DataIngestionService()
     alert_engine = AlertEngine()
-    alert_engine.notification_service = notification_service
+    
+    # Start services in order
+    logger.info("Starting core services")
+    await data_ingestion.start()
     await alert_engine.start()
-    
-    # Start background data ingestion service (non-blocking)
-    data_service = DataIngestionService()
-    data_service.set_alert_engine(alert_engine)
-    
-    # Start data service in background task to avoid blocking HTTP server startup
-    async def start_data_service():
-        try:
-            await data_service.start()
-            logger.info("Data ingestion service started successfully")
-        except Exception as e:
-            logger.error(f"Data ingestion service failed to start: {e}")
-            logger.info("HTTP server will continue running without live data streaming")
-    
-    # Create background task for data service startup
-    asyncio.create_task(start_data_service())
-    
-    # Store service instances for access during shutdown
-    app.state.data_service = data_service
-    app.state.alert_engine = alert_engine
-    app.state.notification_service = notification_service
-    app.state.historical_data_service = historical_data_service
+    await analytics_engine.start()
     
     logger.info("TradeAssist application started successfully")
     
-    yield
-    
-    # Shutdown processes
-    logger.info("Shutting down TradeAssist application")
-    
-    # Stop data ingestion service (if it was started successfully)
     try:
-        if hasattr(app.state.data_service, 'is_running') and app.state.data_service.is_running:
-            await app.state.data_service.stop()
-    except Exception as e:
-        logger.warning(f"Error stopping data service: {e}")
-    
-    # Stop alert engine
-    await app.state.alert_engine.stop()
-    
-    # Stop historical data service
-    await app.state.historical_data_service.stop()
-    
-    # Cleanup notification service
-    await app.state.notification_service.cleanup()
-    
-    # Close database connections
-    await close_database()
-    
-    logger.info("TradeAssist application shutdown complete")
+        yield  # App is running
+    finally:
+        # Shutdown sequence
+        logger.info("Shutting down TradeAssist application")
+        
+        # Stop services in reverse order
+        await analytics_engine.stop()
+        await alert_engine.stop()
+        await data_ingestion.stop()
+        await historical_data_service.stop()
+        
+        # Close database connections
+        await close_database()
+        
+        logger.info("TradeAssist application shutdown complete")
 
 
 def create_app() -> FastAPI:

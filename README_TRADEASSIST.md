@@ -14,11 +14,13 @@ TradeAssist is a self-hosted trading alerts application that streams real-time m
 ### ⚡ Key Features
 - **Sub-second Alert Latency** - Target <500ms from data to notification
 - **Real-Time Market Data** - Live streaming from Schwab API
+- **Historical Data Foundation** - Complete OHLCV data retrieval and storage system
 - **Multi-Channel Notifications** - In-app, sound, and Slack alerts
 - **Advanced Analytics** - ML-powered market insights and predictions
-- **Professional Dashboard** - React-based responsive interface
+- **Professional Dashboard** - React-based responsive interface with data visualization
 - **Enterprise Security** - Google Cloud Secret Manager integration
 - **High Availability** - Circuit breakers and automated recovery
+- **Production Ready** - Comprehensive monitoring, logging, and deployment automation
 
 ### 🏗️ Architecture
 - **Backend**: FastAPI with async WebSocket support

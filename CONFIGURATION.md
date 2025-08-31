@@ -69,6 +69,31 @@ SCHWAB_REDIRECT_URI=https://127.0.0.1
 # SCHWAB_RETRY_ATTEMPTS=3        # Retry failed requests
 ```
 
+### Historical Data Service Configuration
+
+```env
+# Historical Data Cache Settings
+HISTORICAL_DATA_CACHE_TTL=300              # Cache TTL in seconds (5 minutes)
+HISTORICAL_DATA_MAX_SYMBOLS_PER_REQUEST=50  # Max symbols per API request
+HISTORICAL_DATA_MAX_RECORDS_DEFAULT=10000   # Default max records per symbol
+
+# API Rate Limiting for Historical Data
+HISTORICAL_DATA_RATE_LIMIT_REQUESTS=100     # Requests per minute limit
+HISTORICAL_DATA_BATCH_SIZE=25               # Batch size for API requests
+HISTORICAL_DATA_RETRY_ATTEMPTS=3            # Retry attempts for failed requests
+HISTORICAL_DATA_RETRY_DELAY=1               # Delay between retries (seconds)
+
+# Database Performance Settings
+DATABASE_QUERY_TIMEOUT=30                   # Query timeout in seconds
+DATABASE_CONNECTION_POOL_SIZE=10            # Connection pool size
+DATABASE_CONNECTION_OVERFLOW=20             # Pool overflow connections
+
+# Cache Backend Configuration
+CACHE_BACKEND=memory                        # Cache type (memory, redis)
+CACHE_REDIS_URL=redis://localhost:6379/0   # Redis URL (if using Redis)
+CACHE_DEFAULT_TTL=300                       # Default cache TTL in seconds
+```
+
 ### Google Cloud Secret Manager
 
 ```env
@@ -164,23 +189,31 @@ HSTS_MAX_AGE=31536000        # HSTS max age
 CONTENT_SECURITY_POLICY=default-src 'self'
 ```
 
-### Logging Configuration
+### Production Logging Configuration
 
 ```env
-# Logging Settings
-LOG_LEVEL=INFO               # DEBUG, INFO, WARNING, ERROR, CRITICAL
-LOG_FORMAT=json              # json or text
-LOG_FILE=logs/tradeassist.log
-LOG_ROTATION=daily           # daily, weekly, monthly
-LOG_RETENTION_DAYS=30        # Keep log files for N days
-LOG_MAX_SIZE_MB=100         # Maximum log file size
+# Core Logging Settings
+LOG_LEVEL=INFO                              # DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_TO_FILE=true                           # Enable file logging (false for development)
+LOG_FILE_PATH=./logs/tradeassist.log       # Log file path
+LOG_FORMAT=%(asctime)s - %(name)s - %(levelname)s - %(message)s  # Log format
 
-# Component-specific logging
-LOG_DATABASE=INFO
-LOG_ALERTS=INFO
-LOG_WEBSOCKET=INFO
-LOG_API=INFO
-LOG_SCHWAB=DEBUG
+# Log File Rotation Settings
+LOG_FILE_MAX_SIZE=10485760                 # Max file size in bytes (10MB)
+LOG_FILE_BACKUP_COUNT=5                    # Number of backup files to keep
+
+# Production Logging Features
+# - Structured logging with JSON format in production
+# - File rotation with configurable size and retention
+# - Performance metrics logging for historical data operations
+# - Audit logging for data access and API usage
+# - Error tracking with full context for troubleshooting
+
+# Historical Data Logging (Automatic)
+# - Request/response logging with performance metrics
+# - Cache hit/miss tracking for optimization
+# - Error logging with full context for debugging
+# - Audit trail for data access and queries
 ```
 
 ---

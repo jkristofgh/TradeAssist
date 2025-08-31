@@ -49,41 +49,70 @@ def get_historical_data_service() -> HistoricalDataService:
 # Pydantic models for request/response
 
 class HistoricalDataFetchRequest(BaseModel):
-    """Request model for historical data fetch."""
+    """
+    Request model for historical market data fetch.
+    
+    Supports multiple symbols with flexible date ranges and various frequencies.
+    Optimized for both real-time trading applications and historical analysis.
+    """
     
     symbols: List[str] = Field(
         ...,
         min_items=1,
         max_items=50,
-        description="List of trading symbols (e.g., ['AAPL', '/ES', 'SPY'])"
+        description="List of trading symbols",
+        example=["AAPL", "MSFT", "SPY", "/ES"],
+        title="Trading Symbols"
     )
     
     start_date: Optional[datetime] = Field(
         None,
-        description="Start date for historical data (ISO format)"
+        description="Start date for historical data (ISO format). If not provided, defaults to 30 days ago.",
+        example="2024-01-01T00:00:00Z",
+        title="Start Date"
     )
     
     end_date: Optional[datetime] = Field(
         None,
-        description="End date for historical data (ISO format)"
+        description="End date for historical data (ISO format). If not provided, defaults to current date.",
+        example="2024-01-31T23:59:59Z", 
+        title="End Date"
     )
     
     frequency: str = Field(
         default=DataFrequency.DAILY.value,
-        description="Data frequency (1min, 5min, 1h, 1d, etc.)"
+        description="Data frequency for bars",
+        example="1d",
+        title="Data Frequency"
     )
     
     include_extended_hours: bool = Field(
         default=False,
-        description="Include extended hours trading data"
+        description="Include pre-market and after-hours trading data",
+        example=False,
+        title="Extended Hours"
     )
     
     max_records: Optional[int] = Field(
         None,
         ge=1,
         le=10000,
-        description="Maximum number of records per symbol"
+        description="Maximum number of records per symbol (defaults to unlimited within reason)",
+        example=1000,
+        title="Maximum Records"
     )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "symbols": ["AAPL", "MSFT", "SPY"],
+                "start_date": "2024-01-01T00:00:00Z",
+                "end_date": "2024-01-31T23:59:59Z",
+                "frequency": "1d",
+                "include_extended_hours": False,
+                "max_records": 1000
+            }
+        }
     
     @validator('symbols')
     def validate_symbols(cls, v):
@@ -224,7 +253,106 @@ class ServiceStatsResponse(BaseModel):
 
 # API Endpoints
 
-@router.post("/fetch", response_model=HistoricalDataFetchResponse)
+@router.post(
+    "/fetch", 
+    response_model=HistoricalDataFetchResponse,
+    summary="Fetch Historical Market Data",
+    description="""
+    Retrieve historical OHLCV market data for multiple symbols with flexible parameters.
+    
+    **Features:**
+    - Multi-symbol support (up to 50 symbols per request)
+    - Multiple timeframes (1min to daily)
+    - Flexible date ranges (absolute or relative)
+    - Extended hours support
+    - Automatic caching for performance
+    - Data validation and error handling
+    
+    **Usage Examples:**
+    - Daily data for stocks: `{"symbols": ["AAPL", "MSFT"], "frequency": "1d"}`
+    - Intraday data: `{"symbols": ["SPY"], "frequency": "5min", "include_extended_hours": true}`
+    - Date range: `{"symbols": ["ES"], "start_date": "2024-01-01", "end_date": "2024-01-31"}`
+    
+    **Performance Notes:**
+    - Results are cached for repeated requests
+    - Large date ranges may take longer to process
+    - Consider using smaller batches for better performance
+    """,
+    responses={
+        200: {
+            "description": "Historical data retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "message": "Retrieved historical data for 2 symbols",
+                        "total_symbols": 2,
+                        "data": [
+                            {
+                                "symbol": "AAPL",
+                                "frequency": "1d", 
+                                "start_date": "2024-01-01T00:00:00Z",
+                                "end_date": "2024-01-31T23:59:59Z",
+                                "total_bars": 22,
+                                "data_source": "schwab",
+                                "cached": False,
+                                "bars": [
+                                    {
+                                        "timestamp": "2024-01-02T00:00:00Z",
+                                        "open": 185.64,
+                                        "high": 186.95,
+                                        "low": 184.35,
+                                        "close": 185.92,
+                                        "volume": 52165200,
+                                        "open_interest": None
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Invalid request parameters",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Invalid frequency '2min'. Valid options: 1min, 5min, 15min, 30min, 1h, 1d"
+                    }
+                }
+            }
+        },
+        422: {
+            "description": "Request validation error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": [
+                            {
+                                "loc": ["body", "symbols"],
+                                "msg": "ensure this value has at least 1 items",
+                                "type": "value_error.list.min_items"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Failed to fetch historical data: Database connection timeout"
+                    }
+                }
+            }
+        }
+    },
+    tags=["Historical Data"],
+    operation_id="fetch_historical_data"
+)
 async def fetch_historical_data(
     request: HistoricalDataFetchRequest,
     service: HistoricalDataService = Depends(get_historical_data_service)
@@ -314,7 +442,36 @@ async def fetch_historical_data(
         )
 
 
-@router.get("/frequencies", response_model=List[str])
+@router.get(
+    "/frequencies", 
+    response_model=List[str],
+    summary="Get Supported Data Frequencies",
+    description="""
+    Retrieve list of all supported data frequencies for historical data requests.
+    
+    **Available Frequencies:**
+    - **1min, 5min, 15min, 30min** - Intraday frequencies for active trading
+    - **1h, 4h** - Hourly frequencies for swing trading analysis  
+    - **1d** - Daily frequency for longer-term analysis
+    - **1w, 1M** - Weekly and monthly for macro analysis
+    
+    **Usage:**
+    Use this endpoint to validate frequency parameters before making data requests.
+    Different asset classes may have different frequency availability.
+    """,
+    responses={
+        200: {
+            "description": "List of supported frequencies",
+            "content": {
+                "application/json": {
+                    "example": ["1min", "5min", "15min", "30min", "1h", "4h", "1d", "1w", "1M"]
+                }
+            }
+        }
+    },
+    tags=["Historical Data"],
+    operation_id="get_supported_frequencies"
+)
 async def get_supported_frequencies() -> List[str]:
     """
     Get list of supported data frequencies.

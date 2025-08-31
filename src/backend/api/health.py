@@ -6,10 +6,10 @@ for operational visibility and monitoring.
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 
 from ..database.connection import get_db_session
@@ -21,13 +21,38 @@ router = APIRouter()
 
 class HealthResponse(BaseModel):
     """Health check response model."""
-    status: str
-    ingestion_active: bool
-    last_tick: Optional[datetime] = None
-    api_connected: bool
-    active_instruments: int
-    total_rules: int
-    last_alert: Optional[datetime] = None
+    status: str = Field(..., description="Overall system status: healthy, degraded, or unhealthy")
+    ingestion_active: bool = Field(..., description="Whether data ingestion is currently active")
+    last_tick: Optional[datetime] = Field(None, description="Timestamp of last received market data")
+    api_connected: bool = Field(..., description="Whether external API connection is active") 
+    active_instruments: int = Field(..., description="Number of active trading instruments")
+    total_rules: int = Field(..., description="Total number of alert rules configured")
+    last_alert: Optional[datetime] = Field(None, description="Timestamp of last triggered alert")
+    
+    # Historical data service health
+    historical_data_service: Optional[Dict[str, Any]] = Field(None, description="Historical data service health metrics")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "status": "healthy",
+                "ingestion_active": True,
+                "last_tick": "2024-01-15T14:30:00Z",
+                "api_connected": True,
+                "active_instruments": 150,
+                "total_rules": 25,
+                "last_alert": "2024-01-15T14:28:15Z",
+                "historical_data_service": {
+                    "status": "healthy",
+                    "service_running": True,
+                    "schwab_client_connected": True,
+                    "cache_size": 1250,
+                    "total_requests": 1487,
+                    "database_healthy": True,
+                    "data_freshness_minutes": 5
+                }
+            }
+        }
 
 
 class SystemStats(BaseModel):
@@ -42,7 +67,27 @@ class SystemStats(BaseModel):
     avg_evaluation_time_ms: Optional[float] = None
 
 
-@router.get("/health", response_model=HealthResponse)
+@router.get(
+    "/health", 
+    response_model=HealthResponse,
+    summary="Get System Health Status",
+    description="""
+    Get comprehensive health status of the TradeAssist system.
+    
+    **Includes:**
+    - Real-time data ingestion status
+    - External API connectivity status
+    - Active instruments and alert rules count
+    - Historical data service health metrics
+    - Recent activity timestamps
+    
+    **Health Status Levels:**
+    - **healthy**: All systems operational
+    - **degraded**: Some issues detected but system functional
+    - **unhealthy**: Critical issues requiring attention
+    """,
+    tags=["System Health"]
+)
 async def get_health_status() -> HealthResponse:
     """
     Get basic health status of the TradeAssist system.
@@ -54,6 +99,44 @@ async def get_health_status() -> HealthResponse:
         HealthResponse: Current system health status.
     """
     try:
+        # Get historical data service health
+        historical_data_health = None
+        try:
+            from ..services.historical_data_service import HistoricalDataService
+            from ..database.connection import get_db_session
+            
+            # Try to get service instance and health stats
+            service = HistoricalDataService()
+            stats = service.get_performance_stats()
+            
+            # Check database health for historical data
+            async with get_db_session() as session:
+                from ..models.historical_data import MarketDataBar
+                recent_data_result = await session.execute(
+                    select(func.max(MarketDataBar.timestamp))
+                )
+                last_historical_data = recent_data_result.scalar()
+                
+                data_freshness_minutes = None
+                if last_historical_data:
+                    data_freshness_minutes = int((datetime.utcnow() - last_historical_data).total_seconds() / 60)
+            
+            historical_data_health = {
+                "status": "healthy" if stats["service_running"] and stats["schwab_client_connected"] else "degraded",
+                "service_running": stats["service_running"],
+                "schwab_client_connected": stats["schwab_client_connected"],
+                "cache_size": stats["cache_size"],
+                "total_requests": stats["requests_served"],
+                "database_healthy": True,
+                "data_freshness_minutes": data_freshness_minutes
+            }
+        except Exception as e:
+            historical_data_health = {
+                "status": "unhealthy",
+                "service_running": False,
+                "error": str(e)
+            }
+        
         async with get_db_session() as session:
             # Check database connectivity
             await session.execute(select(1))
@@ -96,14 +179,22 @@ async def get_health_status() -> HealthResponse:
                 ingestion_active = time_diff < 60
                 api_connected = time_diff < 300  # 5 minutes for API connection
             
+            # Determine overall status
+            overall_status = "healthy"
+            if not api_connected:
+                overall_status = "degraded"
+            if historical_data_health and historical_data_health.get("status") == "unhealthy":
+                overall_status = "degraded" if overall_status == "healthy" else "unhealthy"
+            
             return HealthResponse(
-                status="healthy" if api_connected else "degraded",
+                status=overall_status,
                 ingestion_active=ingestion_active,
                 last_tick=last_tick,
                 api_connected=api_connected,
                 active_instruments=active_instruments,
                 total_rules=total_rules,
                 last_alert=last_alert,
+                historical_data_service=historical_data_health
             )
             
     except Exception as e:
@@ -114,10 +205,31 @@ async def get_health_status() -> HealthResponse:
             api_connected=False,
             active_instruments=0,
             total_rules=0,
+            historical_data_service={"status": "unhealthy", "error": str(e)}
         )
 
 
-@router.get("/health/detailed", response_model=SystemStats)
+@router.get(
+    "/health/detailed", 
+    response_model=SystemStats,
+    summary="Get Detailed System Statistics",
+    description="""
+    Get comprehensive system statistics and performance metrics.
+    
+    **Detailed Metrics Include:**
+    - Database connectivity and status
+    - Instrument and rule counts (total vs active)
+    - Today's activity metrics (ticks and alerts processed)
+    - Performance metrics (average evaluation times)
+    
+    **Use Cases:**
+    - System monitoring dashboards
+    - Performance analysis and optimization
+    - Capacity planning and scaling decisions
+    - Operational troubleshooting and diagnostics
+    """,
+    tags=["System Health"]
+)
 async def get_detailed_system_stats() -> SystemStats:
     """
     Get detailed system statistics and performance metrics.
