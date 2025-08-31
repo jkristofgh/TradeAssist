@@ -19,6 +19,7 @@ from .api.rules import router as rules_router
 from .api.alerts import router as alerts_router
 from .api.analytics import router as analytics_router
 from .api.auth import router as auth_router
+from .api.historical_data import router as historical_data_router, set_historical_data_service
 from .config import settings
 from .database.connection import init_database, close_database
 from .services.data_ingestion import DataIngestionService
@@ -27,6 +28,7 @@ from .services.notification import NotificationService
 from .services.analytics_engine import analytics_engine
 from .services.ml_models import ml_service
 from .services.market_data_processor import market_data_processor
+from .services.historical_data_service import HistoricalDataService
 from .websocket.realtime import router as websocket_router
 
 logger = structlog.get_logger()
@@ -53,6 +55,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await market_data_processor.initialize()
     await ml_service.initialize_models()
     
+    # Initialize historical data service
+    historical_data_service = HistoricalDataService()
+    await historical_data_service.start()
+    
+    # Set up historical data API dependency
+    set_historical_data_service(historical_data_service)
+    
     # Start alert engine
     alert_engine = AlertEngine()
     alert_engine.notification_service = notification_service
@@ -78,6 +87,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.data_service = data_service
     app.state.alert_engine = alert_engine
     app.state.notification_service = notification_service
+    app.state.historical_data_service = historical_data_service
     
     logger.info("TradeAssist application started successfully")
     
@@ -95,6 +105,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     
     # Stop alert engine
     await app.state.alert_engine.stop()
+    
+    # Stop historical data service
+    await app.state.historical_data_service.stop()
     
     # Cleanup notification service
     await app.state.notification_service.cleanup()
@@ -135,6 +148,7 @@ def create_app() -> FastAPI:
     app.include_router(alerts_router, prefix="/api", tags=["alerts"])
     app.include_router(analytics_router, tags=["analytics"])
     app.include_router(auth_router, prefix="/api", tags=["authentication"])
+    app.include_router(historical_data_router, tags=["historical-data"])
     
     # Include WebSocket router
     app.include_router(websocket_router, prefix="/ws")

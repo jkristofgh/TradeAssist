@@ -1,0 +1,208 @@
+# Historical Data Foundation Extension Configuration
+# Generated: 2025-08-30
+
+extension:
+  name: "Historical Data Foundation"
+  id: "historical_data_foundation"
+  version: "1.0.0"
+  type: "feature_enhancement"
+  target_project: "TradeAssist"
+  description: "Provides historical market data retrieval, storage, and visualization capabilities for stocks, indexes, and futures"
+  
+metadata:
+  generated_date: "2025-08-30"
+  generated_by: "ext-plan-phases command"
+  brd_source: "PRP-EXTENSIONS/EXT_HistorycalDataFoundation/EXT_HistorycalDataFoundation_BRD.md"
+  codebase_analysis_version: "1.0"
+
+compatibility:
+  requires_codebase_analysis_version: ">=1.0"
+  target_system_version: ">=Phase3"
+  python_version: ">=3.9"
+  node_version: ">=16.0"
+  
+dependencies:
+  backend:
+    - "FastAPI >= 0.104.1"
+    - "SQLAlchemy >= 2.0.23"
+    - "aiosqlite >= 0.19.0"
+    - "pydantic >= 2.5.0"
+    - "schwab-package (existing)"
+  frontend:
+    - "React >= 18.2.0"
+    - "TypeScript >= 4.9.5"
+    - "react-chartjs-2 >= 5.2.0"
+    - "Chart.js >= 4.2.1"
+    
+integration_points:
+  backend:
+    - "src/backend/models/base.py - Base class and TimestampMixin"
+    - "src/backend/database/connection.py - Database session management"
+    - "src/backend/integrations/schwab_client.py - API client extension"
+    - "src/backend/services/ - New HistoricalDataService"
+    - "src/backend/api/ - New historical_data router"
+    - "src/backend/main.py - Service and router registration"
+  frontend:
+    - "src/frontend/src/components/ - New HistoricalData components"
+    - "src/frontend/src/services/apiClient.ts - API integration"
+    - "src/frontend/src/context/ - State management integration"
+    - "src/frontend/src/App.tsx - Route registration"
+  database:
+    - "market_data - New table for OHLCV storage"
+    - "indexes - Optimized queries for symbol/timestamp"
+    
+phases:
+  - name: "Data Foundation"
+    id: "phase1_data_foundation"
+    complexity: "low"
+    duration_weeks: "2-3"
+    description: "Core data models, storage, and retrieval infrastructure"
+    deliverables:
+      - "MarketData SQLAlchemy models"
+      - "HistoricalDataService implementation"
+      - "Schwab API integration for historical data"
+      - "Database migrations and indexes"
+      - "Data aggregation and validation logic"
+      - "Unit tests for core functionality"
+    success_criteria:
+      - "Can retrieve and store historical data for any supported symbol"
+      - "Aggregation logic produces consistent results"
+      - "Performance meets database query standards"
+      
+  - name: "API Integration"
+    id: "phase2_api_integration" 
+    complexity: "medium"
+    duration_weeks: "1-2"
+    description: "REST API endpoints and request/response handling"
+    dependencies: ["phase1_data_foundation"]
+    deliverables:
+      - "FastAPI router for historical data endpoints"
+      - "Pydantic request/response models"
+      - "Authentication and validation integration"
+      - "API documentation and error handling"
+      - "Integration tests for all endpoints"
+    success_criteria:
+      - "All API endpoints functional and documented"
+      - "Authentication integration working"
+      - "Performance meets API response standards"
+      
+  - name: "UI Components and Workflow"
+    id: "phase3_ui_components"
+    complexity: "medium" 
+    duration_weeks: "2-3"
+    description: "Frontend interface and user workflow implementation"
+    dependencies: ["phase1_data_foundation", "phase2_api_integration"]
+    deliverables:
+      - "HistoricalDataPanel React component"
+      - "Symbol selection and parameter configuration"
+      - "Data preview table with sorting/filtering"
+      - "Chart visualization integration"
+      - "Saved queries functionality (optional)"
+      - "Frontend component tests"
+    success_criteria:
+      - "UI integrates seamlessly with existing interface"
+      - "User workflows intuitive and consistent"
+      - "Data visualization working correctly"
+      
+  - name: "Integration and Polish"
+    id: "phase4_integration_polish"
+    complexity: "low"
+    duration_weeks: "1"
+    description: "Performance optimization, module preparation, and production readiness"
+    dependencies: ["phase1_data_foundation", "phase2_api_integration", "phase3_ui_components"]
+    deliverables:
+      - "Performance optimization and caching"
+      - "Charts/Indicators module integration interfaces"
+      - "Complete testing and documentation"
+      - "Production deployment configuration"
+    success_criteria:
+      - "System performance meets all benchmarks"
+      - "Ready for Charts/Indicators module integration"
+      - "Production deployment validated"
+
+technical_specifications:
+  database_changes:
+    new_tables:
+      - name: "market_data"
+        description: "OHLCV historical data storage"
+        columns:
+          - "id (PRIMARY KEY)"
+          - "symbol (VARCHAR(50))"
+          - "timestamp (DATETIME)"
+          - "timeframe (VARCHAR(10))"
+          - "open/high/low/close (DECIMAL(12,4))"
+          - "volume (BIGINT)"
+          - "adjustment_factor (DECIMAL(10,6))"
+          - "created_at/updated_at (DATETIME)"
+        indexes:
+          - "idx_symbol_timestamp (symbol, timestamp)"
+          - "idx_symbol_timeframe_timestamp (symbol, timeframe, timestamp)"
+    
+  api_endpoints:
+    - path: "GET /api/v1/historical-data/{symbol}"
+      description: "Retrieve historical data for a symbol"
+    - path: "GET /api/v1/historical-data/{symbol}/timeframes"
+      description: "Get available timeframes for a symbol"
+    - path: "POST /api/v1/historical-data/batch"
+      description: "Batch historical data requests"
+    - path: "GET /api/v1/historical-data/symbols/search"
+      description: "Symbol search and discovery"
+      
+  frontend_components:
+    - component: "HistoricalDataPanel"
+      path: "src/frontend/src/components/HistoricalData/"
+      description: "Main panel for historical data queries"
+    - component: "DataPreview" 
+      path: "src/frontend/src/components/HistoricalData/"
+      description: "Data table with sorting and filtering"
+    - component: "QuickChart"
+      path: "src/frontend/src/components/HistoricalData/"
+      description: "Chart visualization for historical data"
+      
+performance_targets:
+  database:
+    - "Data retrieval: <2s for 1 year daily data"
+    - "Aggregation: <500ms for typical operations"
+    - "Storage: <5s for 1000 data points"
+  api:
+    - "Simple queries: <200ms response time"
+    - "Complex queries: <2s response time"
+    - "Batch operations: <5s for 10 symbols"
+  frontend:
+    - "Component rendering: <300ms for data tables"
+    - "Chart rendering: <500ms for typical datasets"
+    - "Navigation transitions: <150ms"
+
+security_considerations:
+  - "Input validation through Pydantic models"
+  - "SQL injection prevention via SQLAlchemy ORM"
+  - "Authentication integration with existing Schwab auth"
+  - "Data access controls following existing patterns"
+  - "Rate limiting for API endpoints"
+
+monitoring_and_observability:
+  - "Performance metrics for database queries"
+  - "API response time monitoring"
+  - "Error rate tracking and alerting"
+  - "User interaction analytics (privacy-compliant)"
+  - "System resource usage monitoring"
+
+documentation_updates:
+  - "README_TRADEASSIST.md - Feature overview and tech stack"
+  - "USER_GUIDE.md - Historical data feature usage"
+  - "CONFIGURATION.md - New environment variables"
+  - "DEPLOYMENT.md - Extension deployment requirements"
+
+future_integration_readiness:
+  charts_module:
+    - "Historical data formatted for chart consumption"
+    - "OHLCV data with volume overlay support"
+    - "Timeframe flexibility for chart rendering"
+  indicators_module:
+    - "Pandas DataFrame compatible data format"
+    - "Technical analysis ready data structure"
+    - "Historical data accessible for indicator calculations"
+  analytics_module:
+    - "Large dataset handling for ML model training" 
+    - "Data aggregation utilities for analysis"
+    - "Performance optimized data access patterns"
