@@ -1,6 +1,6 @@
 # Extension: Update Extension Completion Summary
 
-## Usage: ext-update-completion [EXTENSION_NAME] [PHASE_NUMBER]
+## Usage: ext-4-update-completion [EXTENSION_NAME] [PHASE_NUMBER]
 
 Creates a comprehensive completion summary for an extension phase, documenting what was actually implemented and preparing context for subsequent phases.
 
@@ -10,9 +10,9 @@ This command analyzes the completed extension implementation and creates detaile
 
 ## Usage Examples
 ```bash
-/ext-update-completion AdvancedCharts 1
-/ext-update-completion MachineLearning 2
-/ext-update-completion MultiUser 3
+/ext-4-update-completion AdvancedCharts 1
+/ext-4-update-completion MachineLearning 2
+/ext-4-update-completion MultiUser 3
 ```
 
 ## Prerequisites Validation
@@ -109,7 +109,7 @@ Validation documentation includes:
 ### File Location
 ```bash
 # Completion summary is created in extension-specific directory:
-PRP-EXTENSIONS/Extension_[ProjectName]_[ExtensionName]/phases/
+PRP-EXTENSIONS/EXT_[ExtensionName]/phases/
 └── EXT_PHASE[N]_[ExtensionName]_COMPLETION.md
 ```
 
@@ -224,12 +224,12 @@ Next phase preparation includes:
 This command completes the phase documentation cycle:
 
 **Previous Steps**:
-- `/ext-analyze-codebase [TARGET_PATH]` - Codebase understanding
-- `/ext-plan-phases [EXTENSION_NAME] [BRD]` - Extension phases planned
-- `/ext-generate-prp [PHASE_REQUIREMENTS]` - Implementation PRP generated
-- `/ext-execute-prp [GENERATED_PRP]` - Extension implemented
+- `/ext-0-analyze-codebase [TARGET_PATH]` - Codebase understanding
+- `/ext-1-generate-prp [EXTENSION_NAME] [BRD]` - Comprehensive PRP generated
+- `/ext-2-plan-phases [PRP_PATH]` - Phase boundaries extracted
+- `/ext-3-execute-prp [PRP_PATH] --phase [N]` - Extension phase implemented
 
-**Current Step**: `/ext-update-completion [EXTENSION_NAME] [PHASE]` - Document implementation
+**Current Step**: `/ext-4-update-completion [EXTENSION_NAME] [PHASE]` - Document implementation
 **Next Steps**: Continue with next phase or finalize extension
 
 ## Success Metrics

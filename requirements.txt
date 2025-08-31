@@ -72,3 +72,9 @@ plotly==5.17.0
 # Memory and Performance Optimization
 psutil==5.9.6
 memory-profiler==0.61.0
+
+# Phase 3: Caching and Performance Enhancement  
+# Note: Redis dependencies available but disabled in current implementation
+# Uncomment for Redis backend support:
+# redis==5.0.1
+# aioredis==2.0.1

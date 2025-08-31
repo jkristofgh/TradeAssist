@@ -8,7 +8,7 @@ alert notifications, and system status updates with <100ms delivery targets.
 import asyncio
 import json
 from datetime import datetime
-from typing import Dict, Set, Optional, Any
+from typing import Dict, Set, Optional, Any, List
 
 import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -225,6 +225,216 @@ class ConnectionManager:
             }
         }
         await self.broadcast(message)
+
+    # Phase 3: Historical Data WebSocket Integration
+    
+    async def broadcast_historical_data_progress(
+        self,
+        query_id: str,
+        symbol: str,
+        progress_percent: float,
+        current_step: str,
+        estimated_completion: Optional[datetime] = None
+    ) -> None:
+        """Broadcast progress updates for historical data queries."""
+        
+        message = WebSocketMessage(
+            type="historical_data_progress",
+            timestamp=datetime.now(),
+            data={
+                "query_id": query_id,
+                "symbol": symbol,
+                "progress_percent": progress_percent,
+                "current_step": current_step,
+                "estimated_completion": estimated_completion.isoformat() if estimated_completion else None,
+                "status": "in_progress"
+            }
+        )
+        
+        await self.broadcast(message)
+        
+        logger.debug(f"Historical data progress broadcasted: {symbol} {progress_percent}%")
+    
+    async def broadcast_historical_data_complete(
+        self,
+        query_id: str,
+        symbol: str,
+        bars_retrieved: int,
+        execution_time_ms: float,
+        cache_hit: bool = False
+    ) -> None:
+        """Broadcast completion of historical data query."""
+        
+        message = WebSocketMessage(
+            type="historical_data_complete",
+            timestamp=datetime.now(),
+            data={
+                "query_id": query_id,
+                "symbol": symbol,
+                "bars_retrieved": bars_retrieved,
+                "execution_time_ms": execution_time_ms,
+                "cache_hit": cache_hit,
+                "status": "complete"
+            }
+        )
+        
+        await self.broadcast(message)
+        
+        logger.info(f"Historical data query completed: {symbol} - {bars_retrieved} bars")
+    
+    async def broadcast_historical_data_error(
+        self,
+        query_id: str,
+        symbol: str,
+        error_message: str,
+        error_type: str = "general"
+    ) -> None:
+        """Broadcast historical data query error."""
+        
+        message = WebSocketMessage(
+            type="historical_data_error",
+            timestamp=datetime.now(),
+            data={
+                "query_id": query_id,
+                "symbol": symbol,
+                "error_message": error_message,
+                "error_type": error_type,
+                "status": "error"
+            }
+        )
+        
+        await self.broadcast(message)
+        
+        logger.error(f"Historical data query error broadcasted: {symbol} - {error_message}")
+    
+    async def broadcast_aggregation_progress(
+        self,
+        aggregation_id: str,
+        symbol: str,
+        source_frequency: str,
+        target_frequency: str,
+        progress_percent: float
+    ) -> None:
+        """Broadcast progress updates for data aggregation operations."""
+        
+        message = WebSocketMessage(
+            type="aggregation_progress",
+            timestamp=datetime.now(),
+            data={
+                "aggregation_id": aggregation_id,
+                "symbol": symbol,
+                "source_frequency": source_frequency,
+                "target_frequency": target_frequency,
+                "progress_percent": progress_percent,
+                "status": "aggregating"
+            }
+        )
+        
+        await self.broadcast(message)
+        
+        logger.debug(f"Aggregation progress: {symbol} {source_frequency}→{target_frequency} {progress_percent}%")
+    
+    async def broadcast_aggregation_complete(
+        self,
+        aggregation_id: str,
+        symbol: str,
+        source_frequency: str,
+        target_frequency: str,
+        source_bars: int,
+        target_bars: int,
+        execution_time_ms: float
+    ) -> None:
+        """Broadcast completion of data aggregation."""
+        
+        message = WebSocketMessage(
+            type="aggregation_complete",
+            timestamp=datetime.now(),
+            data={
+                "aggregation_id": aggregation_id,
+                "symbol": symbol,
+                "source_frequency": source_frequency,
+                "target_frequency": target_frequency,
+                "source_bars": source_bars,
+                "target_bars": target_bars,
+                "compression_ratio": round(target_bars / source_bars if source_bars > 0 else 0, 2),
+                "execution_time_ms": execution_time_ms,
+                "status": "complete"
+            }
+        )
+        
+        await self.broadcast(message)
+        
+        logger.info(f"Aggregation completed: {symbol} {source_bars}→{target_bars} bars in {execution_time_ms}ms")
+    
+    async def broadcast_cache_performance_update(
+        self,
+        cache_hit_rate: float,
+        total_requests: int,
+        redis_available: bool
+    ) -> None:
+        """Broadcast cache performance metrics for monitoring."""
+        
+        message = WebSocketMessage(
+            type="cache_performance",
+            timestamp=datetime.now(),
+            data={
+                "cache_hit_rate": cache_hit_rate,
+                "total_requests": total_requests,
+                "redis_available": redis_available,
+                "status": "healthy" if cache_hit_rate > 50 else "degraded"
+            }
+        )
+        
+        await self.broadcast(message)
+        
+        logger.debug(f"Cache performance update: {cache_hit_rate}% hit rate")
+    
+    async def send_historical_data_stream(
+        self,
+        websocket,
+        query_id: str,
+        symbol: str,
+        bars_data: List[Dict[str, Any]],
+        chunk_size: int = 100
+    ) -> None:
+        """Stream historical data in chunks to a specific WebSocket connection."""
+        
+        try:
+            total_bars = len(bars_data)
+            chunks_sent = 0
+            
+            # Send data in chunks to prevent overwhelming the connection
+            for i in range(0, total_bars, chunk_size):
+                chunk = bars_data[i:i + chunk_size]
+                chunk_number = chunks_sent + 1
+                total_chunks = (total_bars + chunk_size - 1) // chunk_size
+                
+                message = WebSocketMessage(
+                    type="historical_data_chunk",
+                    timestamp=datetime.now(),
+                    data={
+                        "query_id": query_id,
+                        "symbol": symbol,
+                        "chunk_number": chunk_number,
+                        "total_chunks": total_chunks,
+                        "bars": chunk,
+                        "is_final_chunk": chunk_number == total_chunks
+                    }
+                )
+                
+                await self.send_personal_message(websocket, message)
+                chunks_sent += 1
+                
+                # Small delay to prevent overwhelming the client
+                await asyncio.sleep(0.01)
+            
+            logger.info(f"Streamed {total_bars} bars in {chunks_sent} chunks for {symbol}")
+            
+        except Exception as e:
+            logger.error(f"Error streaming historical data for {symbol}: {e}")
+            await self.broadcast_historical_data_error(
+                query_id, symbol, f"Streaming error: {str(e)}", "streaming_error"
+            )
 
 
 # Global connection manager instance

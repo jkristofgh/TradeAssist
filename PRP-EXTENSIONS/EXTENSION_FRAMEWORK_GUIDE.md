@@ -22,59 +22,67 @@ PRP-EXTENSIONS/
 │   ├── TEMPLATE_EXTENSION_PHASE_REQUIREMENTS.md
 │   ├── TEMPLATE_EXTENSION_PHASE_COMPLETION.md
 │   └── extension_prp_base.md
-└── Extension_[ProjectName]_[ExtensionName]/    # Per-extension workspace
+└── EXT_[ExtensionName]/                        # Per-extension workspace
     ├── planning/
-    │   ├── EXTENSION_BRD_[ExtensionName].md
-    │   └── EXTENSION_PHASE_PLAN_[ExtensionName].md
+    │   ├── EXTENSION_BRD.md
+    │   ├── EXTENSION_PHASE_PLAN.md
+    │   └── extension-prp-[extension-name]-[timestamp].md
     ├── phases/
-    │   ├── EXT_PHASE[N]_[ExtensionName]_REQUIREMENTS.md
+    │   ├── PHASE[N]_REQUIREMENTS.md
     │   └── EXT_PHASE[N]_[ExtensionName]_COMPLETION.md
-    └── prps/
-        └── ext-[extension-name]-phase[N]-[timestamp].md
+    └── metadata/
+        └── EXTENSION_CONFIG.yaml
 ```
 
 ## Extension Commands
 
 ### Core Extension Commands
-- **`/ext-analyze-codebase [TARGET_CODEBASE_PATH]`** - One-time codebase analysis (shared)
-- **`/ext-plan-phases [EXTENSION_NAME] [EXTENSION_BRD_PATH]`** - Plan extension phases
-- **`/ext-generate-prp [EXTENSION_PHASE_REQUIREMENTS_PATH]`** - Generate extension PRP
-- **`/ext-execute-prp [EXTENSION_PRP_PATH]`** - Execute extension implementation
-- **`/ext-update-completion [EXTENSION_NAME] [PHASE_NUMBER]`** - Document completion
+- **`/ext-0-analyze-codebase [TARGET_CODEBASE_PATH]`** - One-time codebase analysis (shared)
+- **`/ext-1-generate-prp [EXTENSION_NAME] [EXTENSION_BRD_PATH]`** - Generate comprehensive extension PRP
+- **`/ext-2-plan-phases [COMPREHENSIVE_PRP_PATH]`** - Extract natural phase boundaries from PRP
+- **`/ext-3-execute-prp [COMPREHENSIVE_PRP_PATH] --phase [PHASE_NUMBER]`** - Execute specific phase
+- **`/ext-4-update-completion [EXTENSION_NAME] [PHASE_NUMBER]`** - Document completion
 
 ## Extension Development Workflow
 
-### Phase 1: One-Time Codebase Analysis
+### Step 1: One-Time Codebase Analysis
 ```bash
 # Analyze existing codebase (run once, benefits all extensions)
-/ext-analyze-codebase ./src
+/ext-0-analyze-codebase ./src
 
 # Creates:
 # - PRP-EXTENSIONS/shared/CODEBASE_ANALYSIS.md
 # - PRP-EXTENSIONS/shared/INTEGRATION_POINTS.md
 ```
 
-### Phase 2: Extension Planning
+### Step 2: Generate Comprehensive PRP
 ```bash
-# Plan extension phases using shared codebase analysis
-/ext-plan-phases AdvancedCharts EXTENSION_BRD_AdvancedCharts.md
+# Generate single comprehensive PRP from BRD
+/ext-1-generate-prp AdvancedCharts PRP-EXTENSIONS/EXT_AdvancedCharts/planning/EXTENSION_BRD.md
 
 # Creates:
-# - Extension directory structure
-# - EXTENSION_PHASE_PLAN_AdvancedCharts.md
-# - EXT_PHASE[N]_AdvancedCharts_REQUIREMENTS.md files
+# - PRP-EXTENSIONS/EXT_AdvancedCharts/planning/extension-prp-advancedcharts-[timestamp].md
 ```
 
-### Phase 3: Extension Development (Per Phase)
+### Step 3: Extract Phase Boundaries
 ```bash
-# Generate implementation PRP
-/ext-generate-prp EXT_PHASE1_AdvancedCharts_REQUIREMENTS.md
+# Extract natural phase boundaries from comprehensive PRP
+/ext-2-plan-phases PRP-EXTENSIONS/EXT_AdvancedCharts/planning/extension-prp-advancedcharts-[timestamp].md
 
-# Execute extension implementation
-/ext-execute-prp ext-advancedcharts-phase1-[timestamp].md
+# Creates:
+# - PRP-EXTENSIONS/EXT_AdvancedCharts/planning/EXTENSION_PHASE_PLAN.md
+# - PRP-EXTENSIONS/EXT_AdvancedCharts/phases/PHASE1_REQUIREMENTS.md
+# - PRP-EXTENSIONS/EXT_AdvancedCharts/phases/PHASE2_REQUIREMENTS.md
+# - etc.
+```
 
-# Document what was built
-/ext-update-completion AdvancedCharts 1
+### Step 4: Execute Phases (Per Phase)
+```bash
+# Execute specific phase using comprehensive PRP and phase requirements
+/ext-3-execute-prp PRP-EXTENSIONS/EXT_AdvancedCharts/planning/extension-prp-advancedcharts-[timestamp].md --phase 1
+
+# Document what was built for the phase
+/ext-4-update-completion AdvancedCharts 1
 ```
 
 ## Key Design Principles
@@ -126,16 +134,18 @@ PRP-EXTENSIONS/
 ## Extension Best Practices
 
 ### Planning Phase
-1. **Start with Shared Analysis**: Always run `/ext-analyze-codebase` first
+1. **Start with Shared Analysis**: Always run `/ext-0-analyze-codebase` first
 2. **Clear Extension BRD**: Define specific objectives and success criteria
-3. **Integration-Aware Planning**: Plan phases based on available integration points
-4. **Compatibility Requirements**: Define backward compatibility requirements upfront
+3. **Single Comprehensive PRP**: Generate one complete PRP covering entire extension scope
+4. **Implementation-Driven Phases**: Extract natural phase boundaries based on technical complexity
+5. **Compatibility Requirements**: Define backward compatibility requirements upfront
 
 ### Development Phase
 1. **Follow Existing Patterns**: Use the same code structure and conventions
 2. **Additive Changes Only**: Don't modify existing APIs or workflows
-3. **Comprehensive Testing**: Include regression testing for existing functionality
-4. **Documentation**: Follow existing documentation standards
+3. **Comprehensive Context**: Use single PRP for complete understanding while executing focused phases
+4. **Comprehensive Testing**: Include regression testing for existing functionality
+5. **Documentation**: Follow existing documentation standards
 
 ### Quality Assurance
 1. **Regression Testing**: Verify existing functionality remains intact
@@ -235,10 +245,12 @@ Use `TEMPLATE_EXTENSION_PHASE_COMPLETION.md` to document:
 ## Getting Started
 
 1. **Understand the Base Project**: Familiarize yourself with the existing codebase and patterns
-2. **Run Codebase Analysis**: Execute `/ext-analyze-codebase [TARGET_PATH]` to understand integration opportunities
+2. **Run Codebase Analysis**: Execute `/ext-0-analyze-codebase [TARGET_PATH]` to understand integration opportunities
 3. **Define Extension Requirements**: Create clear Extension BRD defining what you want to build
-4. **Plan Extension Phases**: Use `/ext-plan-phases` to create systematic development plan
-5. **Execute Systematically**: Follow the phase-based development workflow
-6. **Validate Thoroughly**: Ensure compatibility and quality at each step
+4. **Generate Comprehensive PRP**: Use `/ext-1-generate-prp` to create complete technical architecture
+5. **Extract Phase Boundaries**: Use `/ext-2-plan-phases` to discover natural implementation phases
+6. **Execute Phase by Phase**: Use `/ext-3-execute-prp` for focused phase implementation
+7. **Document Progress**: Use `/ext-4-update-completion` to track and prepare for next phases
+8. **Validate Thoroughly**: Ensure compatibility and quality at each step
 
 The Extension Framework enables you to enhance existing projects systematically while maintaining the quality, compatibility, and maintainability that made the original project successful.

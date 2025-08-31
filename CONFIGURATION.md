@@ -10,7 +10,7 @@ This guide covers all configuration options for TradeAssist, from basic setup to
 
 ### Primary Configuration Files
 - **`.env`** - Environment variables and secrets
-- **`alembic.ini`** - Database migration settings  
+- **`alembic.ini`** - Database migration settings
 - **`src/backend/config.py`** - Application configuration class
 - **`src/frontend/package.json`** - Frontend dependencies and scripts
 - **`run.py`** - Main application runner
@@ -59,8 +59,8 @@ MARKET_DATA_RETENTION_DAYS=30  # How long to keep market data
 ```env
 # Schwab API Credentials (Required for real-time data)
 SCHWAB_CLIENT_ID=your_schwab_client_id_here
-SCHWAB_CLIENT_SECRET=your_schwab_client_secret_here  
-SCHWAB_REDIRECT_URI=http://localhost:8080/callback
+SCHWAB_CLIENT_SECRET=your_schwab_client_secret_here
+SCHWAB_REDIRECT_URI=https://127.0.0.1
 
 # API Rate Limiting
 # SCHWAB_REQUESTS_PER_SECOND=10  # API rate limit
@@ -312,7 +312,7 @@ CHECK_MEMORY_USAGE=true
   "private": true,
   "scripts": {
     "dev": "react-scripts start",
-    "build": "react-scripts build", 
+    "build": "react-scripts build",
     "test": "react-scripts test",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
@@ -321,7 +321,7 @@ CHECK_MEMORY_USAGE=true
   },
   "dependencies": {
     "@tanstack/react-query": "^4.24.0",
-    "chart.js": "^4.2.1", 
+    "chart.js": "^4.2.1",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0",
@@ -339,7 +339,7 @@ CHECK_MEMORY_USAGE=true
 }
 ```
 
-#### Environment Variables for Frontend  
+#### Environment Variables for Frontend
 ```env
 # Frontend Configuration (Set via build process)
 REACT_APP_API_BASE_URL=http://localhost:8000
@@ -390,7 +390,7 @@ testpaths = src/tests
 python_files = test_*.py
 python_classes = Test*
 python_functions = test_*
-addopts = 
+addopts =
     -v
     --strict-markers
     --tb=short
@@ -496,20 +496,20 @@ class Settings(BaseSettings):
     environment: str = "production"
     debug: bool = False
     secret_key: str
-    
+
     # Database
     database_url: str = "sqlite+aiosqlite:///./tradeassist.db"
     database_echo: bool = False
-    
+
     # Schwab API
     schwab_app_key: str
     schwab_app_secret: str
     schwab_callback_url: str = "https://localhost:8000/callback"
-    
+
     # Alert Engine
     alert_latency_target_ms: int = 500
     max_concurrent_alerts: int = 50
-    
+
     class Config:
         env_file = ".env"
         case_sensitive = False
@@ -524,19 +524,19 @@ settings = Settings()
 def validate_config():
     """Validate critical configuration settings"""
     errors = []
-    
+
     if not settings.secret_key:
         errors.append("SECRET_KEY is required")
-    
+
     if len(settings.secret_key) < 32:
         errors.append("SECRET_KEY must be at least 32 characters")
-    
+
     if not settings.schwab_app_key:
         errors.append("SCHWAB_APP_KEY is required")
-    
+
     if settings.alert_latency_target_ms < 100:
         errors.append("ALERT_LATENCY_TARGET_MS too low (minimum 100ms)")
-    
+
     if errors:
         raise ValueError(f"Configuration errors: {', '.join(errors)}")
 ```
@@ -549,12 +549,12 @@ class DynamicConfig:
     def __init__(self):
         self.config_cache = {}
         self.last_reload = 0
-    
+
     def reload_config(self):
         """Reload configuration from environment"""
         # Reload non-critical settings without restart
         pass
-    
+
     def update_alert_settings(self, new_settings: dict):
         """Update alert engine settings"""
         # Validate and apply new alert settings
@@ -584,7 +584,7 @@ class DynamicConfig:
 ### Post-Deployment Verification
 
 - [ ] **Health checks** passing
-- [ ] **Database migrations** applied successfully  
+- [ ] **Database migrations** applied successfully
 - [ ] **WebSocket connections** working
 - [ ] **Real-time data** flowing correctly
 - [ ] **Alert processing** within latency targets
@@ -652,7 +652,7 @@ def validate_all_config():
         validate_performance_config,
         validate_notification_config
     ]
-    
+
     for validator in validators:
         try:
             validator()
