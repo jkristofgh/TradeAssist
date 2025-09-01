@@ -277,7 +277,7 @@ const InstrumentRow: React.FC<InstrumentRowProps> = ({
       </div>
       
       <div className={`cell price ${priceChangeClass}`}>
-        {formatPrice(currentPrice ?? instrument.last_price ?? null)}
+        {formatPrice(currentPrice ?? instrument.lastPrice ?? null)}
       </div>
       
       <div className={`cell change ${priceChangeClass}`}>

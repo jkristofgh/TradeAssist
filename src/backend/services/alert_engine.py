@@ -338,36 +338,36 @@ class AlertEngine:
     @handle_db_errors("Evaluation batch processing")
     async def _process_evaluation_batch(self, session, batch_evaluations: List[Dict]) -> None:
         """
-    Process a batch of alert rule evaluations.
-    
-    Args:
-        session: Database session.
-        batch_evaluations: List of evaluation data.
-    """
-    alerts_to_fire = []
-    
-    for eval_data in batch_evaluations:
-        instrument_id = eval_data["instrument_id"]
-        market_data = eval_data["market_data"]
+        Process a batch of alert rule evaluations.
         
-        # Get active rules for this instrument
-        rules = self._active_rules_cache.get(instrument_id, [])
+        Args:
+            session: Database session.
+            batch_evaluations: List of evaluation data.
+        """
+        alerts_to_fire = []
         
-        # Evaluate each rule
-        for rule in rules:
-            # Check cooldown period
-            if rule.is_in_cooldown():
-                continue
+        for eval_data in batch_evaluations:
+            instrument_id = eval_data["instrument_id"]
+            market_data = eval_data["market_data"]
             
-            # Evaluate rule based on type
-            alert_context = await self._evaluate_rule(rule, market_data, session)
+            # Get active rules for this instrument
+            rules = self._active_rules_cache.get(instrument_id, [])
             
-            if alert_context:
-                alerts_to_fire.append(alert_context)
-    
-    # Fire all triggered alerts
-    for alert_context in alerts_to_fire:
-        await self._fire_alert(alert_context, session)
+            # Evaluate each rule
+            for rule in rules:
+                # Check cooldown period
+                if rule.is_in_cooldown():
+                    continue
+                
+                # Evaluate rule based on type
+                alert_context = await self._evaluate_rule(rule, market_data, session)
+                
+                if alert_context:
+                    alerts_to_fire.append(alert_context)
+        
+        # Fire all triggered alerts
+        for alert_context in alerts_to_fire:
+            await self._fire_alert(alert_context, session)
     
     async def _evaluate_rule(
         self,
@@ -413,60 +413,60 @@ class AlertEngine:
     @handle_db_errors("Alert firing")
     async def _fire_alert(self, alert_context: AlertContext, session) -> None:
         """
-    Fire an alert and log the event.
+        Fire an alert and log the event.
+        
+        Args:
+            alert_context: Context data for the alert.
+            session: Database session.
+        """
+        rule = alert_context.rule
     
-    Args:
-        alert_context: Context data for the alert.
-        session: Database session.
-    """
-    rule = alert_context.rule
+        # Create alert log entry
+        alert_log = AlertLog(
+            timestamp=alert_context.timestamp,
+            rule_id=rule.id,
+            instrument_id=rule.instrument_id,
+            trigger_value=alert_context.trigger_value,
+            threshold_value=float(rule.threshold),
+            fired_status=AlertStatus.FIRED,
+            delivery_status=DeliveryStatus.PENDING,
+            evaluation_time_ms=alert_context.evaluation_time_ms,
+            rule_condition=rule.condition.value,
+            alert_message=self._generate_alert_message(alert_context),
+        )
     
-    # Create alert log entry
-    alert_log = AlertLog(
-        timestamp=alert_context.timestamp,
-        rule_id=rule.id,
-        instrument_id=rule.instrument_id,
-        trigger_value=alert_context.trigger_value,
-        threshold_value=float(rule.threshold),
-        fired_status=AlertStatus.FIRED,
-        delivery_status=DeliveryStatus.PENDING,
-        evaluation_time_ms=alert_context.evaluation_time_ms,
-        rule_condition=rule.condition.value,
-        alert_message=self._generate_alert_message(alert_context),
-    )
+        session.add(alert_log)
     
-    session.add(alert_log)
+        # Update rule last triggered time
+        rule.last_triggered = alert_context.timestamp
     
-    # Update rule last triggered time
-    rule.last_triggered = alert_context.timestamp
+        # Update performance metrics
+        self.alerts_fired += 1
+        self.total_evaluation_time_ms += alert_context.evaluation_time_ms
+        self.max_evaluation_time_ms = max(
+            self.max_evaluation_time_ms,
+            alert_context.evaluation_time_ms
+        )
     
-    # Update performance metrics
-    self.alerts_fired += 1
-    self.total_evaluation_time_ms += alert_context.evaluation_time_ms
-    self.max_evaluation_time_ms = max(
-        self.max_evaluation_time_ms,
-        alert_context.evaluation_time_ms
-    )
+        # Broadcast alert via WebSocket
+        await self.websocket_manager.broadcast_alert_fired(
+            rule_id=rule.id,
+            instrument_id=rule.instrument_id,
+            symbol=rule.instrument.symbol,  # Assuming instrument is loaded
+            trigger_value=alert_context.trigger_value,
+            threshold_value=float(rule.threshold),
+            condition=rule.condition.value,
+            timestamp=alert_context.timestamp,
+            evaluation_time_ms=alert_context.evaluation_time_ms
+        )
     
-    # Broadcast alert via WebSocket
-    await self.websocket_manager.broadcast_alert_fired(
-        rule_id=rule.id,
-        instrument_id=rule.instrument_id,
-        symbol=rule.instrument.symbol,  # Assuming instrument is loaded
-        trigger_value=alert_context.trigger_value,
-        threshold_value=float(rule.threshold),
-        condition=rule.condition.value,
-        timestamp=alert_context.timestamp,
-        evaluation_time_ms=alert_context.evaluation_time_ms
-    )
-    
-    logger.info(
-        f"Alert fired for rule {rule.id}: {rule.instrument.symbol} "
-        f"{rule.condition.value} {rule.threshold} (actual: {alert_context.trigger_value})",
-        rule_id=rule.id,
-        instrument_symbol=rule.instrument.symbol,
-        evaluation_time_ms=alert_context.evaluation_time_ms
-    )
+        logger.info(
+            f"Alert fired for rule {rule.id}: {rule.instrument.symbol} "
+            f"{rule.condition.value} {rule.threshold} (actual: {alert_context.trigger_value})",
+            rule_id=rule.id,
+            instrument_symbol=rule.instrument.symbol,
+            evaluation_time_ms=alert_context.evaluation_time_ms
+        )
     
     def _generate_alert_message(self, alert_context: AlertContext) -> str:
         """

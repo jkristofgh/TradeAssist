@@ -9,10 +9,11 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import DateTime, Integer, DECIMAL, String, ForeignKey, Index, Text
+from sqlalchemy import DateTime, Integer, Float, String, ForeignKey, Index, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+from ..database.mixins import SoftDeleteMixin
 
 
 class AlertStatus(str, Enum):
@@ -32,7 +33,7 @@ class DeliveryStatus(str, Enum):
     FAILED = "failed"
 
 
-class AlertLog(Base):
+class AlertLog(Base, SoftDeleteMixin):
     """
     Alert log entry model.
     
@@ -71,13 +72,13 @@ class AlertLog(Base):
     
     # Alert context
     trigger_value: Mapped[float] = mapped_column(
-        DECIMAL(12, 4),
+        Float,
         nullable=False,
         doc="Value that triggered the alert"
     )
     
     threshold_value: Mapped[float] = mapped_column(
-        DECIMAL(12, 4),
+        Float,
         nullable=False,
         doc="Threshold value from the rule"
     )
@@ -149,27 +150,16 @@ class AlertLog(Base):
         lazy="select"
     )
     
-    # Performance indexes - optimized for common query patterns
+    # Optimized indexes for high-frequency INSERT performance (Phase 1 optimized)
     __table_args__ = (
-        # Primary query patterns
+        # Primary timestamp index for time-series queries
         Index("ix_alert_logs_timestamp", "timestamp"),
-        Index("ix_alert_logs_rule", "rule_id"),
-        Index("ix_alert_logs_instrument", "instrument_id"),
-        
-        # Composite indexes for common queries
-        Index("ix_alert_logs_timestamp_instrument", "timestamp", "instrument_id"),
-        Index("ix_alert_logs_timestamp_rule", "timestamp", "rule_id"),
+        # Composite index for rule-based queries
         Index("ix_alert_logs_rule_timestamp", "rule_id", "timestamp"),
-        
-        # Status-based queries
-        Index("ix_alert_logs_fired_status", "fired_status"),
-        Index("ix_alert_logs_delivery_status", "delivery_status"),
-        
-        # Performance monitoring queries
-        Index("ix_alert_logs_evaluation_time", "evaluation_time_ms"),
-        
-        # Recent alerts queries (for dashboard)
-        Index("ix_alert_logs_recent", "timestamp", "fired_status", "instrument_id"),
+        # Composite index for instrument-based queries
+        Index("ix_alert_logs_timestamp_instrument", "timestamp", "instrument_id"),
+        # Composite status index for delivery tracking
+        Index("ix_alert_logs_status", "fired_status", "delivery_status"),
     )
     
     def __repr__(self) -> str:

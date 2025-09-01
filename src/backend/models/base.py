@@ -2,6 +2,7 @@
 Base database model definitions.
 
 Contains common base classes and configurations for all SQLAlchemy models.
+Enhanced with standardized serialization and response formatting capabilities.
 """
 
 from datetime import datetime
@@ -11,9 +12,17 @@ from sqlalchemy import DateTime, func
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+# Import enhanced serialization capabilities from database mixins to avoid circular imports
+from ..database.mixins import EnhancedSerializationMixin
 
-class Base(DeclarativeBase):
-    """Base class for all database models."""
+
+class Base(DeclarativeBase, EnhancedSerializationMixin):
+    """
+    Base class for all database models.
+    
+    Enhanced with standardized serialization capabilities for consistent
+    API responses and database error handling.
+    """
     
     @declared_attr
     def __tablename__(cls) -> str:
@@ -22,18 +31,6 @@ class Base(DeclarativeBase):
         import re
         name = re.sub(r'(?<!^)(?=[A-Z])', '_', cls.__name__).lower()
         return name
-    
-    def to_dict(self) -> dict[str, Any]:
-        """
-        Convert model instance to dictionary.
-        
-        Returns:
-            dict: Model data as dictionary.
-        """
-        return {
-            column.name: getattr(self, column.name)
-            for column in self.__table__.columns
-        }
 
 
 class TimestampMixin:

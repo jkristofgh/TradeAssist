@@ -17,6 +17,10 @@ from ..database.connection import get_db_session
 from ..models.instruments import Instrument
 from ..models.market_data import MarketData
 
+# Import standardized API components
+from .common.exceptions import StandardAPIError, SystemError
+from .common.responses import HealthResponseBuilder
+
 logger = structlog.get_logger(__name__)
 
 router = APIRouter()
@@ -130,37 +134,20 @@ class PerformanceImprovementMetrics(BaseModel):
     last_measurement_date: datetime = Field(..., description="Last performance measurement timestamp")
 
 
-@router.get(
-    "/health", 
-    response_model=HealthResponse,
-    summary="Get System Health Status",
-    description="""
-    Get comprehensive health status of the TradeAssist system.
-    
-    **Includes:**
-    - Real-time data ingestion status
-    - External API connectivity status
-    - Active instruments and alert rules count
-    - Historical data service health metrics
-    - Recent activity timestamps
-    
-    **Health Status Levels:**
-    - **healthy**: All systems operational
-    - **degraded**: Some issues detected but system functional
-    - **unhealthy**: Critical issues requiring attention
-    """,
-    tags=["System Health"]
-)
-async def get_health_status() -> HealthResponse:
+@router.get("/health")
+async def get_health_status() -> dict:
     """
     Get basic health status of the TradeAssist system.
-    
+
     Returns system health including ingestion status, connectivity,
     and basic operational metrics for monitoring.
-    
+
     Returns:
-        HealthResponse: Current system health status.
+        dict: Current system health status with standardized response format.
     """
+    start_time = datetime.utcnow()
+    response_builder = HealthResponseBuilder()
+    
     try:
         # Get historical data service health
         historical_data_health = None
@@ -249,26 +236,33 @@ async def get_health_status() -> HealthResponse:
             if historical_data_health and historical_data_health.get("status") == "unhealthy":
                 overall_status = "degraded" if overall_status == "healthy" else "unhealthy"
             
-            return HealthResponse(
-                status=overall_status,
-                ingestion_active=ingestion_active,
-                last_tick=last_tick,
-                api_connected=api_connected,
-                active_instruments=active_instruments,
-                total_rules=total_rules,
-                last_alert=last_alert,
-                historical_data_service=historical_data_health
-            )
+            health_data = {
+                "status": overall_status,
+                "ingestion_active": ingestion_active,
+                "last_tick": last_tick.isoformat() if last_tick else None,
+                "api_connected": api_connected,
+                "active_instruments": active_instruments,
+                "total_rules": total_rules,
+                "last_alert": last_alert.isoformat() if last_alert else None,
+                "historical_data_service": historical_data_health,
+                "timestamp": datetime.utcnow().isoformat()
+            }
             
+            # Calculate performance metrics
+            processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+            
+            return response_builder.success(health_data) \
+                .with_performance_metrics(processing_time, active_instruments + total_rules) \
+                .build()
+            
+    except StandardAPIError:
+        raise
     except Exception as e:
-        # Return error status if health check fails
-        return HealthResponse(
-            status="unhealthy",
-            ingestion_active=False,
-            api_connected=False,
-            active_instruments=0,
-            total_rules=0,
-            historical_data_service={"status": "unhealthy", "error": str(e)}
+        logger.error("Health check failed", error=str(e))
+        raise SystemError(
+            error_code="HEALTH_001", 
+            message="System health check failed",
+            details={"error": str(e)}
         )
 
 

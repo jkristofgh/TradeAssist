@@ -24,8 +24,31 @@ import {
   AlertLogFilters,
   PaginationParams,
   PaginatedResponse,
-  ApiResponse
-} from '../types';
+  ApiResponse,
+  // Analytics types
+  AnalyticsRequest,
+  PredictionRequest,
+  RiskRequest,
+  StressTestRequest,
+  VolumeProfileRequest,
+  MarketAnalysisResponse,
+  TechnicalIndicatorResponse,
+  PredictionResponse,
+  AnomalyDetectionResponse,
+  TrendClassificationResponse,
+  VarCalculationResponse,
+  RiskMetricsResponse,
+  StressTestResponse,
+  VolumeProfileResponse,
+  CorrelationMatrixResponse,
+  MarketMicrostructureResponse
+} from '../types/models';
+import {
+  transformApiResponse,
+  transformApiRequest,
+  TypedTransformer,
+  extractErrorMessage
+} from '../utils/typeTransforms';
 
 // =============================================================================
 // API CLIENT CLASS
@@ -70,14 +93,17 @@ export class ApiClient {
       const data = await response.json();
 
       if (!response.ok) {
+        // Transform error data for consistency
+        const errorData = transformApiResponse(data);
         throw new ApiError(
           response.status,
-          data.message || data.detail || 'Request failed',
-          data
+          extractErrorMessage(errorData),
+          errorData
         );
       }
 
-      return data as T;
+      // Transform response data from snake_case to camelCase
+      return transformApiResponse<T>(data);
     } catch (error) {
       if (error instanceof ApiError) {
         throw error;
@@ -98,16 +124,18 @@ export class ApiClient {
   }
 
   private async post<T>(endpoint: string, data?: any): Promise<T> {
+    const transformedData = data ? transformApiRequest(data) : undefined;
     return this.request<T>(endpoint, {
       method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
+      body: transformedData ? JSON.stringify(transformedData) : undefined,
     });
   }
 
   private async put<T>(endpoint: string, data?: any): Promise<T> {
+    const transformedData = data ? transformApiRequest(data) : undefined;
     return this.request<T>(endpoint, {
       method: 'PUT',
-      body: data ? JSON.stringify(data) : undefined,
+      body: transformedData ? JSON.stringify(transformedData) : undefined,
     });
   }
 
@@ -229,6 +257,64 @@ export class ApiClient {
   }
 
   // =============================================================================
+  // ANALYTICS API
+  // =============================================================================
+
+  async getMarketAnalysis(request: AnalyticsRequest): Promise<MarketAnalysisResponse> {
+    return this.post<MarketAnalysisResponse>('/api/analytics/market-analysis', request);
+  }
+
+  async getRealTimeIndicators(request: AnalyticsRequest): Promise<TechnicalIndicatorResponse> {
+    return this.post<TechnicalIndicatorResponse>('/api/analytics/real-time-indicators', request);
+  }
+
+  async predictPrice(request: PredictionRequest): Promise<PredictionResponse> {
+    return this.post<PredictionResponse>('/api/analytics/price-prediction', request);
+  }
+
+  async detectAnomalies(request: AnalyticsRequest): Promise<AnomalyDetectionResponse> {
+    return this.post<AnomalyDetectionResponse>('/api/analytics/anomaly-detection', request);
+  }
+
+  async classifyTrend(request: AnalyticsRequest): Promise<TrendClassificationResponse> {
+    return this.post<TrendClassificationResponse>('/api/analytics/trend-classification', request);
+  }
+
+  async calculateVar(request: RiskRequest): Promise<VarCalculationResponse> {
+    return this.post<VarCalculationResponse>('/api/analytics/var-calculation', request);
+  }
+
+  async getRiskMetrics(request: RiskRequest): Promise<RiskMetricsResponse> {
+    return this.post<RiskMetricsResponse>('/api/analytics/risk-metrics', request);
+  }
+
+  async performStressTest(request: StressTestRequest): Promise<StressTestResponse> {
+    return this.post<StressTestResponse>('/api/analytics/stress-test', request);
+  }
+
+  async getVolumeProfile(request: VolumeProfileRequest): Promise<VolumeProfileResponse> {
+    return this.post<VolumeProfileResponse>('/api/analytics/volume-profile', request);
+  }
+
+  async getCorrelationMatrix(instrumentIds: number[], timeframe?: string): Promise<CorrelationMatrixResponse> {
+    return this.post<CorrelationMatrixResponse>('/api/analytics/correlation-matrix', {
+      instrumentIds,
+      timeframe
+    });
+  }
+
+  async getMarketMicrostructure(instrumentId: number): Promise<MarketMicrostructureResponse> {
+    return this.post<MarketMicrostructureResponse>('/api/analytics/market-microstructure', {
+      instrumentId
+    });
+  }
+
+  // Analytics health check
+  async getAnalyticsHealth(): Promise<{ status: string; services: Record<string, any> }> {
+    return this.get('/api/analytics/health');
+  }
+
+  // =============================================================================
   // UTILITY METHODS
   // =============================================================================
 
@@ -257,6 +343,81 @@ export class ApiClient {
   // Remove authentication header
   clearAuthToken(): void {
     delete this.defaultHeaders['Authorization'];
+  }
+
+  // Set demo mode
+  setDemoMode(enabled: boolean): void {
+    if (enabled) {
+      this.defaultHeaders['X-Demo-Mode'] = 'true';
+    } else {
+      delete this.defaultHeaders['X-Demo-Mode'];
+    }
+  }
+
+  // =============================================================================
+  // AUTHENTICATION API
+  // =============================================================================
+
+  async initiateOAuth(): Promise<{
+    authorization_url: string;
+    state: string;
+    expires_at: string;
+    demo_mode: boolean;
+  }> {
+    return this.post('/api/auth/oauth/initiate');
+  }
+
+  async completeOAuth(code: string, state: string): Promise<{
+    access_token: string;
+    refresh_token: string;
+    token_type: string;
+    expires_in: number;
+    scope: string;
+    user_info: any;
+    demo_mode: boolean;
+  }> {
+    return this.post('/api/auth/oauth/complete', {
+      code,
+      state
+    });
+  }
+
+  async refreshToken(refreshToken?: string): Promise<{
+    access_token: string;
+    refresh_token: string;
+    token_type: string;
+    expires_in: number;
+    scope: string;
+    user_info: any;
+    demo_mode: boolean;
+  }> {
+    // If no refresh token provided, try to get it from storage
+    const tokenToUse = refreshToken || sessionStorage.getItem('refresh_token');
+    
+    if (!tokenToUse) {
+      throw new ApiError(401, 'No refresh token available', null);
+    }
+
+    return this.post('/api/auth/token/refresh', {
+      refresh_token: tokenToUse
+    });
+  }
+
+  async getAuthStatus(): Promise<{
+    is_authenticated: boolean;
+    user_info?: any;
+    token_expires_at?: string;
+    demo_mode: boolean;
+    connection_status: string;
+  }> {
+    return this.get('/api/auth/status');
+  }
+
+  async logout(): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return this.post('/api/auth/logout');
   }
 }
 
@@ -333,6 +494,23 @@ export const queryKeys = {
   alerts: (filters?: AlertLogFilters, pagination?: PaginationParams) => 
     ['alerts', filters, pagination] as const,
   alertStats: () => ['alerts', 'stats'] as const,
+
+  // Analytics
+  analytics: {
+    health: () => ['analytics', 'health'] as const,
+    marketAnalysis: (request: AnalyticsRequest) => ['analytics', 'market-analysis', request] as const,
+    realTimeIndicators: (request: AnalyticsRequest) => ['analytics', 'real-time-indicators', request] as const,
+    pricePrediction: (request: PredictionRequest) => ['analytics', 'price-prediction', request] as const,
+    anomalyDetection: (request: AnalyticsRequest) => ['analytics', 'anomaly-detection', request] as const,
+    trendClassification: (request: AnalyticsRequest) => ['analytics', 'trend-classification', request] as const,
+    varCalculation: (request: RiskRequest) => ['analytics', 'var-calculation', request] as const,
+    riskMetrics: (request: RiskRequest) => ['analytics', 'risk-metrics', request] as const,
+    stressTest: (request: StressTestRequest) => ['analytics', 'stress-test', request] as const,
+    volumeProfile: (request: VolumeProfileRequest) => ['analytics', 'volume-profile', request] as const,
+    correlationMatrix: (instrumentIds: number[], timeframe?: string) => 
+      ['analytics', 'correlation-matrix', instrumentIds, timeframe] as const,
+    marketMicrostructure: (instrumentId: number) => ['analytics', 'market-microstructure', instrumentId] as const,
+  }
 };
 
 /**

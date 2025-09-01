@@ -117,14 +117,14 @@ const exportToCsv = (alerts: AlertLogWithDetails[]): string => {
   const rows = alerts.map(alert => [
     alert.timestamp,
     alert.instrument?.symbol || 'Unknown',
-    alert.rule?.name || `Rule ${alert.rule_id}`,
-    alert.rule_condition,
-    alert.trigger_value,
-    alert.threshold_value,
-    alert.fired_status,
-    alert.delivery_status,
-    alert.evaluation_time_ms || 0,
-    alert.alert_message || ''
+    alert.rule?.name || `Rule ${alert.ruleId}`,
+    alert.ruleCondition,
+    alert.triggerValue,
+    alert.thresholdValue,
+    alert.firedStatus,
+    alert.deliveryStatus,
+    alert.evaluationTimeMs || 0,
+    alert.alertMessage || ''
   ]);
   
   return [headers, ...rows]
@@ -152,7 +152,7 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
   const [filters, setFilters] = useState<AlertLogFilters>({});
   const [pagination, setPagination] = useState<PaginationParams>({
     page: 1,
-    per_page: 50
+    perPage: 50
   });
   const [selectedAlerts, setSelectedAlerts] = useState<Set<number>>(new Set());
   const [showExportModal, setShowExportModal] = useState(false);
@@ -209,14 +209,14 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
   }, []);
 
   const handlePerPageChange = useCallback((perPage: number) => {
-    setPagination({ page: 1, per_page: perPage });
+    setPagination({ page: 1, perPage: perPage });
   }, []);
 
   const handleDatePreset = useCallback((days: number) => {
     const range = getDateRangeFromPreset(days);
     handleFilterChange({
-      start_date: range.start,
-      end_date: range.end
+      startDate: range.start,
+      endDate: range.end
     });
   }, [handleFilterChange]);
 
@@ -246,10 +246,10 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
       if (exportOptions.includeAll) {
         // Export all alerts with date range filter
         const exportFilters: AlertLogFilters = {
-          start_date: exportOptions.dateRange.start,
-          end_date: exportOptions.dateRange.end
+          startDate: exportOptions.dateRange.start,
+          endDate: exportOptions.dateRange.end
         };
-        const allAlertsResponse = await apiClient.getAlerts(exportFilters, { page: 1, per_page: 10000 });
+        const allAlertsResponse = await apiClient.getAlerts(exportFilters, { page: 1, perPage: 10000 });
         alertsToExport = allAlertsResponse.items;
       } else {
         // Export only selected alerts
@@ -283,7 +283,7 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
 
   // Computed values
   const alerts = alertsResponse?.items || [];
-  const totalPages = Math.ceil((alertsResponse?.total || 0) / (pagination.per_page || 25));
+  const totalPages = Math.ceil((alertsResponse?.total || 0) / (pagination.perPage || 25));
   
   const filteredStats = useMemo(() => {
     if (!stats) return null;
@@ -344,23 +344,23 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
         <div className="stats-dashboard">
           <div className="stats-grid">
             <div className="stat-card">
-              <div className="stat-value">{stats.total_alerts_this_week?.toLocaleString() || '0'}</div>
+              <div className="stat-value">{stats.totalAlertsThisWeek?.toLocaleString() || '0'}</div>
               <div className="stat-label">Total Alerts (Week)</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">{stats.total_alerts_today?.toLocaleString() || '0'}</div>
+              <div className="stat-value">{stats.totalAlertsToday?.toLocaleString() || '0'}</div>
               <div className="stat-label">Today</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">{stats.avg_evaluation_time_ms ? formatDuration(stats.avg_evaluation_time_ms) : 'N/A'}</div>
+              <div className="stat-value">{stats.avgEvaluationTimeMs ? formatDuration(stats.avgEvaluationTimeMs) : 'N/A'}</div>
               <div className="stat-label">Avg Eval Time</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">{stats.fastest_evaluation_ms || 'N/A'}</div>
+              <div className="stat-value">{stats.fastestEvaluationMs || 'N/A'}</div>
               <div className="stat-label">Fastest</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">{stats.slowest_evaluation_ms || 'N/A'}</div>
+              <div className="stat-value">{stats.slowestEvaluationMs || 'N/A'}</div>
               <div className="stat-label">Slowest</div>
             </div>
           </div>
@@ -391,8 +391,8 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
             <label>From:</label>
             <input
               type="date"
-              value={filters.start_date || ''}
-              onChange={(e) => handleFilterChange({ start_date: e.target.value || undefined })}
+              value={filters.startDate || ''}
+              onChange={(e) => handleFilterChange({ startDate: e.target.value || undefined })}
               className="date-input"
             />
           </div>
@@ -401,8 +401,8 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
             <label>To:</label>
             <input
               type="date"
-              value={filters.end_date || ''}
-              onChange={(e) => handleFilterChange({ end_date: e.target.value || undefined })}
+              value={filters.endDate || ''}
+              onChange={(e) => handleFilterChange({ endDate: e.target.value || undefined })}
               className="date-input"
             />
           </div>
@@ -410,9 +410,9 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
           <div className="filter-group">
             <label>Status:</label>
             <select 
-              value={filters.fired_status || ''} 
+              value={filters.firedStatus || ''} 
               onChange={(e) => handleFilterChange({
-                fired_status: e.target.value as AlertStatus || undefined
+                firedStatus: e.target.value as AlertStatus || undefined
               })}
               className="filter-select"
             >
@@ -426,9 +426,9 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
           <div className="filter-group">
             <label>Delivery:</label>
             <select 
-              value={filters.delivery_status || ''} 
+              value={filters.deliveryStatus || ''} 
               onChange={(e) => handleFilterChange({
-                delivery_status: e.target.value as DeliveryStatus || undefined
+                deliveryStatus: e.target.value as DeliveryStatus || undefined
               })}
               className="filter-select"
             >
@@ -442,9 +442,9 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
           <div className="filter-group">
             <label>Instrument:</label>
             <select 
-              value={filters.instrument_id || ''} 
+              value={filters.instrumentId || ''} 
               onChange={(e) => handleFilterChange({
-                instrument_id: e.target.value ? parseInt(e.target.value) : undefined
+                instrumentId: e.target.value ? parseInt(e.target.value) : undefined
               })}
               className="filter-select"
             >
@@ -458,9 +458,9 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
           <div className="filter-group">
             <label>Rule:</label>
             <select 
-              value={filters.rule_id || ''} 
+              value={filters.ruleId || ''} 
               onChange={(e) => handleFilterChange({
-                rule_id: e.target.value ? parseInt(e.target.value) : undefined
+                ruleId: e.target.value ? parseInt(e.target.value) : undefined
               })}
               className="filter-select"
             >
@@ -532,34 +532,34 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
                     </span>
                   </div>
                   <div className="col-rule">
-                    <div className="rule-name">{alert.rule?.name || `Rule ${alert.rule_id}`}</div>
-                    {alert.alert_message && (
-                      <div className="alert-message">{alert.alert_message}</div>
+                    <div className="rule-name">{alert.rule?.name || `Rule ${alert.ruleId}`}</div>
+                    {alert.alertMessage && (
+                      <div className="alert-message">{alert.alertMessage}</div>
                     )}
                   </div>
                   <div className="col-condition">
-                    <span className="condition">{alert.rule_condition.replace('_', ' ')}</span>
+                    <span className="condition">{alert.ruleCondition.replace('_', ' ')}</span>
                   </div>
                   <div className="col-values">
                     <div className="values">
-                      <span className="trigger-value">{alert.trigger_value.toFixed(4)}</span>
+                      <span className="trigger-value">{alert.triggerValue.toFixed(4)}</span>
                       <span className="separator">/</span>
-                      <span className="threshold-value">{alert.threshold_value.toFixed(4)}</span>
+                      <span className="threshold-value">{alert.thresholdValue.toFixed(4)}</span>
                     </div>
                   </div>
                   <div className="col-status">
-                    <span className={`status-badge status-${getStatusColor(alert.fired_status)}`}>
-                      {alert.fired_status}
+                    <span className={`status-badge status-${getStatusColor(alert.firedStatus)}`}>
+                      {alert.firedStatus}
                     </span>
                   </div>
                   <div className="col-delivery">
-                    <span className={`status-badge status-${getStatusColor(alert.delivery_status)}`}>
-                      {alert.delivery_status.replace('_', ' ')}
+                    <span className={`status-badge status-${getStatusColor(alert.deliveryStatus)}`}>
+                      {alert.deliveryStatus.replace('_', ' ')}
                     </span>
                   </div>
                   <div className="col-eval-time">
                     <span className="eval-time">
-                      {alert.evaluation_time_ms ? formatDuration(alert.evaluation_time_ms) : 'N/A'}
+                      {alert.evaluationTimeMs ? formatDuration(alert.evaluationTimeMs) : 'N/A'}
                     </span>
                   </div>
                 </div>
@@ -570,12 +570,12 @@ const AlertHistory: React.FC<AlertHistoryProps> = ({ className = '' }) => {
             <div className="pagination-container">
               <div className="pagination-info">
                 <span>
-                  Showing {(((pagination.page || 1) - 1) * (pagination.per_page || 25)) + 1} to{' '}
-                  {Math.min((pagination.page || 1) * (pagination.per_page || 25), alertsResponse?.total || 0)} of{' '}
+                  Showing {(((pagination.page || 1) - 1) * (pagination.perPage || 25)) + 1} to{' '}
+                  {Math.min((pagination.page || 1) * (pagination.perPage || 25), alertsResponse?.total || 0)} of{' '}
                   {alertsResponse?.total || 0} alerts
                 </span>
                 <select
-                  value={pagination.per_page || 25}
+                  value={pagination.perPage || 25}
                   onChange={(e) => handlePerPageChange(parseInt(e.target.value))}
                   className="per-page-select"
                 >

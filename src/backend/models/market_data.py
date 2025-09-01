@@ -8,13 +8,14 @@ with optimized time-series storage and querying capabilities.
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, Integer, DECIMAL, ForeignKey, Index
+from sqlalchemy import DateTime, Integer, Float, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+from ..database.mixins import SoftDeleteMixin
 
 
-class MarketData(Base):
+class MarketData(Base, SoftDeleteMixin):
     """
     Market data tick model.
     
@@ -46,7 +47,7 @@ class MarketData(Base):
     
     # Core market data fields
     price: Mapped[Optional[float]] = mapped_column(
-        DECIMAL(12, 4),
+        Float,
         nullable=True,
         doc="Current price (last trade price)"
     )
@@ -58,13 +59,13 @@ class MarketData(Base):
     )
     
     bid: Mapped[Optional[float]] = mapped_column(
-        DECIMAL(12, 4),
+        Float,
         nullable=True,
         doc="Best bid price"
     )
     
     ask: Mapped[Optional[float]] = mapped_column(
-        DECIMAL(12, 4),
+        Float,
         nullable=True,
         doc="Best ask price"
     )
@@ -83,19 +84,19 @@ class MarketData(Base):
     )
     
     open_price: Mapped[Optional[float]] = mapped_column(
-        DECIMAL(12, 4),
+        Float,
         nullable=True,
         doc="Session open price"
     )
     
     high_price: Mapped[Optional[float]] = mapped_column(
-        DECIMAL(12, 4),
+        Float,
         nullable=True,
         doc="Session high price"
     )
     
     low_price: Mapped[Optional[float]] = mapped_column(
-        DECIMAL(12, 4),
+        Float,
         nullable=True,
         doc="Session low price"
     )
@@ -107,17 +108,12 @@ class MarketData(Base):
         lazy="select"
     )
     
-    # Performance indexes - critical for real-time queries
+    # Optimized indexes for high-frequency INSERT performance (Phase 1 optimized)
     __table_args__ = (
         # Composite index for timestamp + instrument lookups (most common query)
         Index("ix_market_data_timestamp_instrument", "timestamp", "instrument_id"),
-        # Individual indexes for common filters
-        Index("ix_market_data_timestamp", "timestamp"),
-        Index("ix_market_data_instrument", "instrument_id"),
-        # Index for price-based queries (alert evaluation)
-        Index("ix_market_data_price", "price"),
-        # Covering index for latest data queries
-        Index("ix_market_data_latest", "instrument_id", "timestamp", "price"),
+        # Composite index for instrument + price queries (alert evaluation)
+        Index("ix_market_data_instrument_price", "instrument_id", "price"),
     )
     
     def __repr__(self) -> str:

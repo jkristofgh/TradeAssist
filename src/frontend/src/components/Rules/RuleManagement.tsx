@@ -30,28 +30,28 @@ interface RuleManagementProps {
 }
 
 interface RuleFormData {
-  instrument_id: number;
-  rule_type: RuleType;
+  instrumentId: number;
+  ruleType: RuleType;
   condition: RuleCondition;
   threshold: number;
   active: boolean;
   name: string;
   description: string;
-  time_window_seconds?: number;
-  moving_average_period?: number;
-  cooldown_seconds: number;
+  timeWindowSeconds?: number;
+  movingAveragePeriod?: number;
+  cooldownSeconds: number;
 }
 
 interface RuleTemplate {
   id: string;
   name: string;
   description: string;
-  rule_type: RuleType;
+  ruleType: RuleType;
   condition: RuleCondition;
   threshold: number;
-  cooldown_seconds: number;
-  time_window_seconds?: number;
-  moving_average_period?: number;
+  cooldownSeconds: number;
+  timeWindowSeconds?: number;
+  movingAveragePeriod?: number;
 }
 
 interface BulkAction {
@@ -65,48 +65,48 @@ const RULE_TEMPLATES: RuleTemplate[] = [
     id: 'price_above',
     name: 'Price Above Threshold',
     description: 'Alert when price goes above a specific value',
-    rule_type: RuleType.THRESHOLD,
+    ruleType: RuleType.THRESHOLD,
     condition: RuleCondition.ABOVE,
     threshold: 0,
-    cooldown_seconds: 300
+    cooldownSeconds: 300
   },
   {
     id: 'price_below',
     name: 'Price Below Threshold', 
     description: 'Alert when price drops below a specific value',
-    rule_type: RuleType.THRESHOLD,
+    ruleType: RuleType.THRESHOLD,
     condition: RuleCondition.BELOW,
     threshold: 0,
-    cooldown_seconds: 300
+    cooldownSeconds: 300
   },
   {
     id: 'price_crossover_up',
     name: 'Price Breakout Up',
     description: 'Alert when price breaks above moving average',
-    rule_type: RuleType.CROSSOVER,
+    ruleType: RuleType.CROSSOVER,
     condition: RuleCondition.CROSSES_ABOVE,
     threshold: 0,
-    cooldown_seconds: 600,
-    moving_average_period: 20
+    cooldownSeconds: 600,
+    movingAveragePeriod: 20
   },
   {
     id: 'volume_spike',
     name: 'Volume Spike',
     description: 'Alert when volume exceeds normal levels',
-    rule_type: RuleType.VOLUME_SPIKE,
+    ruleType: RuleType.VOLUME_SPIKE,
     condition: RuleCondition.VOLUME_ABOVE,
     threshold: 1000,
-    cooldown_seconds: 180
+    cooldownSeconds: 180
   },
   {
     id: 'percent_change_up',
     name: 'Percent Change Up',
     description: 'Alert on significant percentage increase',
-    rule_type: RuleType.RATE_OF_CHANGE,
+    ruleType: RuleType.RATE_OF_CHANGE,
     condition: RuleCondition.PERCENT_CHANGE_UP,
     threshold: 2.0,
-    cooldown_seconds: 900,
-    time_window_seconds: 300
+    cooldownSeconds: 900,
+    timeWindowSeconds: 300
   }
 ];
 
@@ -115,22 +115,22 @@ const RULE_TEMPLATES: RuleTemplate[] = [
 // =============================================================================
 
 const getInitialFormData = (): RuleFormData => ({
-  instrument_id: 0,
-  rule_type: RuleType.THRESHOLD,
+  instrumentId: 0,
+  ruleType: RuleType.THRESHOLD,
   condition: RuleCondition.ABOVE,
   threshold: 0,
   active: true,
   name: '',
   description: '',
-  cooldown_seconds: 300
+  cooldownSeconds: 300
 });
 
 const validateForm = (data: RuleFormData, instruments: Instrument[]): string[] => {
   const errors: string[] = [];
   
-  if (!data.instrument_id || data.instrument_id === 0) {
+  if (!data.instrumentId || data.instrumentId === 0) {
     errors.push('Please select an instrument');
-  } else if (!instruments.find(i => i.id === data.instrument_id)) {
+  } else if (!instruments.find(i => i.id === data.instrumentId)) {
     errors.push('Selected instrument not found');
   }
   
@@ -138,19 +138,19 @@ const validateForm = (data: RuleFormData, instruments: Instrument[]): string[] =
     errors.push('Rule name is required');
   }
   
-  if (data.threshold <= 0 && data.rule_type !== RuleType.CROSSOVER) {
+  if (data.threshold <= 0 && data.ruleType !== RuleType.CROSSOVER) {
     errors.push('Threshold must be greater than 0');
   }
   
-  if (data.cooldown_seconds < 0) {
+  if (data.cooldownSeconds < 0) {
     errors.push('Cooldown cannot be negative');
   }
   
-  if (data.time_window_seconds && data.time_window_seconds < 1) {
+  if (data.timeWindowSeconds && data.timeWindowSeconds < 1) {
     errors.push('Time window must be at least 1 second');
   }
   
-  if (data.moving_average_period && data.moving_average_period < 2) {
+  if (data.movingAveragePeriod && data.movingAveragePeriod < 2) {
     errors.push('Moving average period must be at least 2');
   }
   
@@ -255,16 +255,16 @@ const RuleManagement: React.FC<RuleManagementProps> = ({ className = '' }) => {
   const handleEditRule = useCallback((rule: AlertRule) => {
     setEditingRule(rule);
     setFormData({
-      instrument_id: rule.instrument_id,
-      rule_type: rule.rule_type,
+      instrumentId: rule.instrumentId,
+      ruleType: rule.ruleType,
       condition: rule.condition,
       threshold: rule.threshold,
       active: rule.active,
       name: rule.name || '',
       description: rule.description || '',
-      time_window_seconds: rule.time_window_seconds || undefined,
-      moving_average_period: rule.moving_average_period || undefined,
-      cooldown_seconds: rule.cooldown_seconds
+      timeWindowSeconds: rule.timeWindowSeconds || undefined,
+      movingAveragePeriod: rule.movingAveragePeriod || undefined,
+      cooldownSeconds: rule.cooldownSeconds
     });
     setShowForm(true);
   }, []);
@@ -277,16 +277,16 @@ const RuleManagement: React.FC<RuleManagementProps> = ({ className = '' }) => {
     }
 
     const requestData: CreateAlertRuleRequest | UpdateAlertRuleRequest = {
-      instrument_id: formData.instrument_id,
-      rule_type: formData.rule_type,
+      instrumentId: formData.instrumentId,
+      ruleType: formData.ruleType,
       condition: formData.condition,
       threshold: formData.threshold,
       active: formData.active,
       name: formData.name,
       description: formData.description,
-      time_window_seconds: formData.time_window_seconds,
-      moving_average_period: formData.moving_average_period,
-      cooldown_seconds: formData.cooldown_seconds
+      timeWindowSeconds: formData.timeWindowSeconds,
+      movingAveragePeriod: formData.movingAveragePeriod,
+      cooldownSeconds: formData.cooldownSeconds
     };
 
     if (editingRule) {
@@ -326,14 +326,14 @@ const RuleManagement: React.FC<RuleManagementProps> = ({ className = '' }) => {
   const handleApplyTemplate = useCallback((template: RuleTemplate) => {
     setFormData({
       ...getInitialFormData(),
-      rule_type: template.rule_type,
+      ruleType: template.ruleType,
       condition: template.condition,
       threshold: template.threshold,
       name: template.name,
       description: template.description,
-      cooldown_seconds: template.cooldown_seconds,
-      time_window_seconds: template.time_window_seconds,
-      moving_average_period: template.moving_average_period
+      cooldownSeconds: template.cooldownSeconds,
+      timeWindowSeconds: template.timeWindowSeconds,
+      movingAveragePeriod: template.movingAveragePeriod
     });
   }, []);
 
@@ -351,8 +351,8 @@ const RuleManagement: React.FC<RuleManagementProps> = ({ className = '' }) => {
   const filteredRules = useMemo(() => {
     return rules.filter(rule => {
       if (filters.active !== undefined && rule.active !== filters.active) return false;
-      if (filters.rule_type && rule.rule_type !== filters.rule_type) return false;
-      if (filters.instrument_id && rule.instrument_id !== filters.instrument_id) return false;
+      if (filters.ruleType && rule.ruleType !== filters.ruleType) return false;
+      if (filters.instrumentId && rule.instrumentId !== filters.instrumentId) return false;
       return true;
     });
   }, [rules, filters]);
@@ -362,12 +362,12 @@ const RuleManagement: React.FC<RuleManagementProps> = ({ className = '' }) => {
   }, [formData, instruments]);
 
   const availableConditions = useMemo(() => {
-    return getRuleConditionsForType(formData.rule_type);
-  }, [formData.rule_type]);
+    return getRuleConditionsForType(formData.ruleType);
+  }, [formData.ruleType]);
 
   const selectedInstrument = useMemo(() => {
-    return instruments.find(i => i.id === formData.instrument_id);
-  }, [instruments, formData.instrument_id]);
+    return instruments.find(i => i.id === formData.instrumentId);
+  }, [instruments, formData.instrumentId]);
 
   const previewText = useMemo(() => {
     if (!selectedInstrument || validationErrors.length > 0) return '';
@@ -376,14 +376,14 @@ const RuleManagement: React.FC<RuleManagementProps> = ({ className = '' }) => {
       [RuleCondition.ABOVE]: `rises above ${formData.threshold}`,
       [RuleCondition.BELOW]: `falls below ${formData.threshold}`,
       [RuleCondition.EQUALS]: `equals ${formData.threshold}`,
-      [RuleCondition.CROSSES_ABOVE]: `crosses above its ${formData.moving_average_period || 20}-period moving average`,
-      [RuleCondition.CROSSES_BELOW]: `crosses below its ${formData.moving_average_period || 20}-period moving average`,
-      [RuleCondition.PERCENT_CHANGE_UP]: `increases by ${formData.threshold}% ${formData.time_window_seconds ? `in ${formData.time_window_seconds} seconds` : ''}`,
-      [RuleCondition.PERCENT_CHANGE_DOWN]: `decreases by ${formData.threshold}% ${formData.time_window_seconds ? `in ${formData.time_window_seconds} seconds` : ''}`,
+      [RuleCondition.CROSSES_ABOVE]: `crosses above its ${formData.movingAveragePeriod || 20}-period moving average`,
+      [RuleCondition.CROSSES_BELOW]: `crosses below its ${formData.movingAveragePeriod || 20}-period moving average`,
+      [RuleCondition.PERCENT_CHANGE_UP]: `increases by ${formData.threshold}% ${formData.timeWindowSeconds ? `in ${formData.timeWindowSeconds} seconds` : ''}`,
+      [RuleCondition.PERCENT_CHANGE_DOWN]: `decreases by ${formData.threshold}% ${formData.timeWindowSeconds ? `in ${formData.timeWindowSeconds} seconds` : ''}`,
       [RuleCondition.VOLUME_ABOVE]: `volume exceeds ${formData.threshold}`
     }[formData.condition];
 
-    return `Alert when ${selectedInstrument.symbol} ${conditionText}. Cooldown: ${formData.cooldown_seconds} seconds.`;
+    return `Alert when ${selectedInstrument.symbol} ${conditionText}. Cooldown: ${formData.cooldownSeconds} seconds.`;
   }, [selectedInstrument, formData, validationErrors]);
 
   if (rulesLoading || instrumentsLoading) {
@@ -450,10 +450,10 @@ const RuleManagement: React.FC<RuleManagementProps> = ({ className = '' }) => {
         <div className="filter-group">
           <label>Rule Type:</label>
           <select 
-            value={filters.rule_type || ''} 
+            value={filters.ruleType || ''} 
             onChange={(e) => setFilters({
               ...filters,
-              rule_type: e.target.value as RuleType || undefined
+              ruleType: e.target.value as RuleType || undefined
             })}
             className="filter-select"
           >
@@ -467,10 +467,10 @@ const RuleManagement: React.FC<RuleManagementProps> = ({ className = '' }) => {
         <div className="filter-group">
           <label>Instrument:</label>
           <select 
-            value={filters.instrument_id || ''} 
+            value={filters.instrumentId || ''} 
             onChange={(e) => setFilters({
               ...filters,
-              instrument_id: e.target.value ? parseInt(e.target.value) : undefined
+              instrumentId: e.target.value ? parseInt(e.target.value) : undefined
             })}
             className="filter-select"
           >
@@ -545,7 +545,7 @@ const RuleManagement: React.FC<RuleManagementProps> = ({ className = '' }) => {
             </div>
             
             {filteredRules.map(rule => {
-              const instrument = instruments.find(i => i.id === rule.instrument_id);
+              const instrument = instruments.find(i => i.id === rule.instrumentId);
               return (
                 <div key={rule.id} className={`table-row ${!rule.active ? 'inactive' : ''}`}>
                   <div className="col-checkbox">
@@ -565,7 +565,7 @@ const RuleManagement: React.FC<RuleManagementProps> = ({ className = '' }) => {
                     <span className="instrument-symbol">{instrument?.symbol || 'Unknown'}</span>
                   </div>
                   <div className="col-type">
-                    <span className="rule-type">{rule.rule_type.replace('_', ' ')}</span>
+                    <span className="rule-type">{rule.ruleType.replace('_', ' ')}</span>
                   </div>
                   <div className="col-condition">
                     <span className="rule-condition">{rule.condition.replace('_', ' ')}</span>
@@ -663,8 +663,8 @@ const RuleManagement: React.FC<RuleManagementProps> = ({ className = '' }) => {
                   <div className="form-group">
                     <label>Instrument *</label>
                     <select
-                      value={formData.instrument_id}
-                      onChange={(e) => setFormData({ ...formData, instrument_id: parseInt(e.target.value) })}
+                      value={formData.instrumentId}
+                      onChange={(e) => setFormData({ ...formData, instrumentId: parseInt(e.target.value) })}
                       className="form-select"
                     >
                       <option value={0}>Select Instrument</option>
@@ -679,13 +679,13 @@ const RuleManagement: React.FC<RuleManagementProps> = ({ className = '' }) => {
                   <div className="form-group">
                     <label>Rule Type *</label>
                     <select
-                      value={formData.rule_type}
+                      value={formData.ruleType}
                       onChange={(e) => {
                         const newRuleType = e.target.value as RuleType;
                         const availableConditions = getRuleConditionsForType(newRuleType);
                         setFormData({ 
                           ...formData, 
-                          rule_type: newRuleType,
+                          ruleType: newRuleType,
                           condition: availableConditions[0]
                         });
                       }}
@@ -734,33 +734,33 @@ const RuleManagement: React.FC<RuleManagementProps> = ({ className = '' }) => {
                     <input
                       type="number"
                       min="0"
-                      value={formData.cooldown_seconds}
-                      onChange={(e) => setFormData({ ...formData, cooldown_seconds: parseInt(e.target.value) || 300 })}
+                      value={formData.cooldownSeconds}
+                      onChange={(e) => setFormData({ ...formData, cooldownSeconds: parseInt(e.target.value) || 300 })}
                       className="form-input"
                     />
                   </div>
 
-                  {(formData.rule_type === RuleType.RATE_OF_CHANGE) && (
+                  {(formData.ruleType === RuleType.RATE_OF_CHANGE) && (
                     <div className="form-group">
                       <label>Time Window (seconds)</label>
                       <input
                         type="number"
                         min="1"
-                        value={formData.time_window_seconds || ''}
-                        onChange={(e) => setFormData({ ...formData, time_window_seconds: parseInt(e.target.value) || undefined })}
+                        value={formData.timeWindowSeconds || ''}
+                        onChange={(e) => setFormData({ ...formData, timeWindowSeconds: parseInt(e.target.value) || undefined })}
                         className="form-input"
                       />
                     </div>
                   )}
 
-                  {(formData.rule_type === RuleType.CROSSOVER) && (
+                  {(formData.ruleType === RuleType.CROSSOVER) && (
                     <div className="form-group">
                       <label>Moving Average Period</label>
                       <input
                         type="number"
                         min="2"
-                        value={formData.moving_average_period || ''}
-                        onChange={(e) => setFormData({ ...formData, moving_average_period: parseInt(e.target.value) || undefined })}
+                        value={formData.movingAveragePeriod || ''}
+                        onChange={(e) => setFormData({ ...formData, movingAveragePeriod: parseInt(e.target.value) || undefined })}
                         className="form-input"
                       />
                     </div>

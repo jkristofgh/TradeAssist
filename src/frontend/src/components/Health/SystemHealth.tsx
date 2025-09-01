@@ -85,10 +85,10 @@ const getHealthScore = (health: any): number => {
   let score = 100;
   
   // Overall system status impact based on actual API response
-  if (health.database_status === 'disconnected') score -= 30;
-  if (health.active_instruments === 0) score -= 20;
-  if (health.active_rules === 0) score -= 15;
-  if (health.avg_evaluation_time_ms && health.avg_evaluation_time_ms > 100) score -= 10;
+  if (health.databaseStatus === 'disconnected') score -= 30;
+  if (health.activeInstruments === 0) score -= 20;
+  if (health.totalRules === 0) score -= 15;
+  if (health.avgEvaluationTimeMs && health.avgEvaluationTimeMs > 100) score -= 10;
   
   return Math.max(0, Math.min(100, score));
 };
@@ -144,21 +144,21 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ className = '' }) => {
     return [
       {
         name: 'Data Ingestion',
-        status: health.ingestion_active ? 'running' : 'stopped',
+        status: health.ingestionActive ? 'running' : 'stopped',
         details: {
-          'Ingestion Active': health.ingestion_active ? 'Yes' : 'No',
-          'Active Instruments': health.active_instruments,
-          'API Connected': health.api_connected ? 'Yes' : 'No',
-          'Last Tick': health.last_tick ? new Date(health.last_tick).toLocaleString() : 'Never'
+          'Ingestion Active': health.ingestionActive ? 'Yes' : 'No',
+          'Active Instruments': health.activeInstruments,
+          'API Connected': health.apiConnected ? 'Yes' : 'No',
+          'Last Tick': health.lastTick ? new Date(health.lastTick).toLocaleString() : 'Never'
         },
         lastUpdate: new Date().toISOString()
       },
       {
         name: 'Alert Engine',
-        status: health.total_rules > 0 ? 'running' : 'stopped',
+        status: health.totalRules > 0 ? 'running' : 'stopped',
         details: {
-          'Total Rules': health.total_rules,
-          'Last Alert': health.last_alert ? new Date(health.last_alert).toLocaleString() : 'None',
+          'Total Rules': health.totalRules,
+          'Last Alert': health.lastAlert ? new Date(health.lastAlert).toLocaleString() : 'None',
           'System Status': health.status
         },
         lastUpdate: new Date().toISOString()
@@ -178,32 +178,32 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ className = '' }) => {
       },
       {
         label: 'API Connection',
-        value: health.api_connected ? 'Connected' : 'Disconnected',
-        status: health.api_connected ? 'healthy' : 'error',
+        value: health.apiConnected ? 'Connected' : 'Disconnected',
+        status: health.apiConnected ? 'healthy' : 'error',
         description: 'External API connection status'
       },
       {
         label: 'Active Instruments',
-        value: health.active_instruments,
-        status: health.active_instruments > 0 ? 'healthy' : 'warning',
+        value: health.activeInstruments,
+        status: health.activeInstruments > 0 ? 'healthy' : 'warning',
         description: 'Number of active trading instruments'
       },
       {
         label: 'Alert Rules',
-        value: health.total_rules,
-        status: health.total_rules > 0 ? 'healthy' : 'warning',
+        value: health.totalRules,
+        status: health.totalRules > 0 ? 'healthy' : 'warning',
         description: 'Total alert rules configured'
       },
       {
         label: 'Data Ingestion',
-        value: health.ingestion_active ? 'Active' : 'Stopped',
-        status: health.ingestion_active ? 'healthy' : 'warning',
+        value: health.ingestionActive ? 'Active' : 'Stopped',
+        status: health.ingestionActive ? 'healthy' : 'warning',
         description: 'Market data ingestion status'
       },
       {
         label: 'Last Market Data',
-        value: health.last_tick ? new Date(health.last_tick).toLocaleString() : 'Never',
-        status: health.last_tick ? 'healthy' : 'warning',
+        value: health.lastTick ? new Date(health.lastTick).toLocaleString() : 'Never',
+        status: health.lastTick ? 'healthy' : 'warning',
         description: 'Timestamp of last received market data'
       }
     ];
@@ -350,8 +350,8 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ className = '' }) => {
               </div>
               <div className="info-item">
                 <span className="info-label">API Connection:</span>
-                <span className={`info-value status-text status-${health.api_connected ? 'healthy' : 'error'}`}>
-                  {health.api_connected ? 'Connected' : 'Disconnected'}
+                <span className={`info-value status-text status-${health.apiConnected ? 'healthy' : 'error'}`}>
+                  {health.apiConnected ? 'Connected' : 'Disconnected'}
                 </span>
               </div>
             </div>
@@ -361,47 +361,47 @@ const SystemHealth: React.FC<SystemHealthProps> = ({ className = '' }) => {
               <div className="info-item">
                 <span className="info-label">Alert Rules:</span>
                 <span className="info-value">
-                  {health.total_rules} configured
+                  {health.totalRules} configured
                 </span>
               </div>
               <div className="info-item">
                 <span className="info-label">Data Ingestion:</span>
                 <span className="info-value">
-                  {health.ingestion_active ? 'Active' : 'Stopped'}
+                  {health.ingestionActive ? 'Active' : 'Stopped'}
                 </span>
               </div>
               <div className="info-item">
                 <span className="info-label">Last Tick:</span>
-                <span className="info-value">{health.last_tick ? new Date(health.last_tick).toLocaleString() : 'Never'}</span>
+                <span className="info-value">{health.lastTick ? new Date(health.lastTick).toLocaleString() : 'Never'}</span>
               </div>
             </div>
             
             <div className="info-section">
               <h4>Historical Data Service</h4>
-              {health.historical_data_service ? (
+              {health.historicalDataService ? (
                 <>
                   <div className="info-item">
                     <span className="info-label">Status:</span>
-                    <span className={`info-value status-text status-${health.historical_data_service.status}`}>
-                      {health.historical_data_service.status}
+                    <span className={`info-value status-text status-${health.historicalDataService.status}`}>
+                      {health.historicalDataService.status}
                     </span>
                   </div>
                   <div className="info-item">
                     <span className="info-label">Service Running:</span>
                     <span className="info-value">
-                      {health.historical_data_service.service_running ? 'Yes' : 'No'}
+                      {health.historicalDataService.serviceRunning ? 'Yes' : 'No'}
                     </span>
                   </div>
-                  {health.historical_data_service.cache_size && (
+                  {health.historicalDataService.cacheSize && (
                     <div className="info-item">
                       <span className="info-label">Cache Size:</span>
-                      <span className="info-value">{health.historical_data_service.cache_size}</span>
+                      <span className="info-value">{health.historicalDataService.cacheSize}</span>
                     </div>
                   )}
-                  {health.historical_data_service.error && (
+                  {health.historicalDataService.error && (
                     <div className="info-item">
                       <span className="info-label">Error:</span>
-                      <span className="info-value status-text status-error">{health.historical_data_service.error}</span>
+                      <span className="info-value status-text status-error">{health.historicalDataService.error}</span>
                     </div>
                   )}
                 </>

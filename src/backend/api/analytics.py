@@ -22,6 +22,16 @@ from ..database.connection import get_db_session
 from ..models.instruments import Instrument
 from sqlalchemy import select
 
+# Import standardized API components
+from .common.exceptions import StandardAPIError, ValidationError, SystemError
+from .common.responses import AnalyticsResponseBuilder
+from .common.validators import (
+    validate_instrument_exists, 
+    validate_lookback_hours, 
+    validate_confidence_level
+)
+from .common.configuration import TechnicalIndicatorConfig, ValidationConfig
+
 logger = logging.getLogger(__name__)
 
 # Create router
@@ -68,6 +78,8 @@ class VolumeProfileRequest(BaseModel):
 
 # Analytics endpoints
 @router.get("/market-analysis/{instrument_id}")
+@validate_instrument_exists
+@validate_lookback_hours(min_hours=1, max_hours=8760)
 async def get_market_analysis(
     instrument_id: int = Path(..., description="Instrument ID"),
     lookback_hours: int = Query(default=24, ge=1, le=8760),
@@ -79,21 +91,26 @@ async def get_market_analysis(
     Returns technical indicators, trend analysis, volatility metrics,
     support/resistance levels, and pattern signals.
     """
+    start_time = datetime.utcnow()
+    response_builder = AnalyticsResponseBuilder()
+    
     try:
-        # Validate instrument exists
+        # Get instrument (validation decorator already confirmed it exists)
         result = await session.execute(
             select(Instrument).where(Instrument.id == instrument_id)
         )
-        instrument = result.scalar_one_or_none()
-        if not instrument:
-            raise HTTPException(status_code=404, detail="Instrument not found")
+        instrument = result.scalar_one()
         
         # Get market analysis
         analysis = await analytics_engine.get_market_analysis(instrument_id, lookback_hours)
         if not analysis:
-            raise HTTPException(status_code=404, detail="Insufficient data for analysis")
+            raise ValidationError(
+                error_code="ANALYTICS_001",
+                message="Insufficient data for market analysis",
+                details={"instrument_id": instrument_id, "lookback_hours": lookback_hours}
+            )
         
-        # Convert to serializable format
+        # Prepare response data
         response_data = {
             "timestamp": analysis.timestamp.isoformat(),
             "instrument_id": analysis.instrument_id,
@@ -114,16 +131,29 @@ async def get_market_analysis(
             "pattern_signals": analysis.pattern_signals
         }
         
-        return JSONResponse(content=response_data)
+        # Calculate performance metrics
+        processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+        data_points = len(analysis.technical_indicators)
         
-    except HTTPException:
+        # Build standardized response
+        return response_builder.success(response_data) \
+            .with_performance_metrics(processing_time, data_points) \
+            .with_confidence_score(getattr(analysis, 'confidence_score', 1.0)) \
+            .build()
+        
+    except StandardAPIError:
         raise
     except Exception as e:
         logger.error(f"Error getting market analysis: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise SystemError(
+            error_code="ANALYTICS_002", 
+            message="Failed to process market analysis request",
+            details={"instrument_id": instrument_id, "error": str(e)}
+        )
 
 
 @router.get("/real-time-indicators/{instrument_id}")
+@validate_instrument_exists
 async def get_real_time_indicators(
     instrument_id: int = Path(..., description="Instrument ID"),
     indicators: List[str] = Query(default=["rsi", "macd", "bollinger_bands"]),
@@ -135,27 +165,32 @@ async def get_real_time_indicators(
     Available indicators: rsi, macd, bollinger_bands, moving_average, 
     stochastic, atr, adx
     """
+    start_time = datetime.utcnow()
+    response_builder = AnalyticsResponseBuilder()
+    
     try:
-        # Validate instrument
+        # Get instrument (validation decorator already confirmed it exists)
         result = await session.execute(
             select(Instrument).where(Instrument.id == instrument_id)
         )
-        instrument = result.scalar_one_or_none()
-        if not instrument:
-            raise HTTPException(status_code=404, detail="Instrument not found")
+        instrument = result.scalar_one()
         
         # Convert string indicators to enum
         try:
             indicator_enums = [TechnicalIndicator(ind) for ind in indicators]
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"Invalid indicator: {e}")
+            raise ValidationError(
+                error_code="ANALYTICS_003",
+                message=f"Invalid technical indicator: {e}",
+                details={"invalid_indicators": indicators, "available_indicators": [ti.value for ti in TechnicalIndicator]}
+            )
         
         # Get real-time indicators
         results = await analytics_engine.get_real_time_indicators(
             instrument_id, indicator_enums
         )
         
-        # Format response
+        # Prepare response data
         response_data = {
             "timestamp": datetime.utcnow().isoformat(),
             "instrument_id": instrument_id,
@@ -171,16 +206,29 @@ async def get_real_time_indicators(
             ]
         }
         
-        return JSONResponse(content=response_data)
+        # Calculate performance metrics
+        processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+        data_points = len(results)
         
-    except HTTPException:
+        # Build standardized response
+        return response_builder.success(response_data) \
+            .with_performance_metrics(processing_time, data_points) \
+            .build()
+        
+    except StandardAPIError:
         raise
     except Exception as e:
         logger.error(f"Error getting real-time indicators: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise SystemError(
+            error_code="ANALYTICS_004", 
+            message="Failed to retrieve real-time indicators",
+            details={"instrument_id": instrument_id, "error": str(e)}
+        )
 
 
 @router.post("/predict-price")
+@validate_instrument_exists
+@validate_confidence_level(allowed=[0.7, 0.8, 0.9, 0.95, 0.99])
 async def predict_price(request: PredictionRequest, session=Depends(get_db_session)):
     """
     Predict future price using machine learning models.
@@ -188,21 +236,31 @@ async def predict_price(request: PredictionRequest, session=Depends(get_db_sessi
     Available models: lstm_price_predictor, random_forest_predictor
     Horizons: short_term (5 minutes), medium_term (1 hour), long_term (1 day)
     """
+    start_time = datetime.utcnow()
+    response_builder = AnalyticsResponseBuilder()
+    
     try:
-        # Validate instrument
+        # Get instrument (validation decorator already confirmed it exists)
         result = await session.execute(
             select(Instrument).where(Instrument.id == request.instrument_id)
         )
-        instrument = result.scalar_one_or_none()
-        if not instrument:
-            raise HTTPException(status_code=404, detail="Instrument not found")
+        instrument = result.scalar_one()
         
-        # Convert string enums
+        # Convert string enums with validation
         try:
             model_type = ModelType(request.model_type)
             horizon = PredictionHorizon(request.horizon)
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"Invalid parameter: {e}")
+            raise ValidationError(
+                error_code="ANALYTICS_005",
+                message=f"Invalid prediction parameter: {e}",
+                details={
+                    "provided_model_type": request.model_type,
+                    "provided_horizon": request.horizon,
+                    "available_models": [mt.value for mt in ModelType],
+                    "available_horizons": [ph.value for ph in PredictionHorizon]
+                }
+            )
         
         # Get prediction
         prediction = await ml_service.predict_price(
@@ -210,29 +268,13 @@ async def predict_price(request: PredictionRequest, session=Depends(get_db_sessi
         )
         
         if not prediction:
-            raise HTTPException(status_code=404, detail="Unable to generate prediction")
-        
-        if prediction.confidence_score < request.confidence_threshold:
-            return JSONResponse(
-                status_code=202,
-                content={
-                    "message": "Prediction available but confidence below threshold",
-                    "confidence_threshold": request.confidence_threshold,
-                    "actual_confidence": prediction.confidence_score,
-                    "prediction": {
-                        "model_type": prediction.model_type.value,
-                        "timestamp": prediction.timestamp.isoformat(),
-                        "instrument_id": prediction.instrument_id,
-                        "predicted_value": prediction.predicted_value,
-                        "confidence_score": prediction.confidence_score,
-                        "prediction_horizon": prediction.prediction_horizon.value,
-                        "feature_importance": prediction.feature_importance,
-                        "metadata": prediction.metadata
-                    }
-                }
+            raise ValidationError(
+                error_code="ANALYTICS_006",
+                message="Unable to generate price prediction",
+                details={"instrument_id": request.instrument_id, "reason": "insufficient_data"}
             )
         
-        # High confidence prediction
+        # Prepare response data
         response_data = {
             "model_type": prediction.model_type.value,
             "timestamp": prediction.timestamp.isoformat(),
@@ -245,16 +287,38 @@ async def predict_price(request: PredictionRequest, session=Depends(get_db_sessi
             "metadata": prediction.metadata
         }
         
-        return JSONResponse(content=response_data)
+        # Check confidence threshold
+        if prediction.confidence_score < request.confidence_threshold:
+            response_data["warning"] = {
+                "message": "Prediction confidence below requested threshold",
+                "confidence_threshold": request.confidence_threshold,
+                "actual_confidence": prediction.confidence_score
+            }
         
-    except HTTPException:
+        # Calculate performance metrics
+        processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+        
+        # Build standardized response
+        return response_builder.success(response_data) \
+            .with_performance_metrics(processing_time, 1) \
+            .with_confidence_score(prediction.confidence_score) \
+            .with_model_metadata(model_type.value, "1.0") \
+            .build()
+        
+    except StandardAPIError:
         raise
     except Exception as e:
         logger.error(f"Error predicting price: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise SystemError(
+            error_code="ANALYTICS_007", 
+            message="Failed to generate price prediction",
+            details={"instrument_id": request.instrument_id, "error": str(e)}
+        )
 
 
 @router.get("/anomaly-detection/{instrument_id}")
+@validate_instrument_exists
+@validate_lookback_hours(min_hours=1, max_hours=168)
 async def detect_anomalies(
     instrument_id: int = Path(..., description="Instrument ID"),
     lookback_hours: int = Query(default=24, ge=1, le=168),
@@ -265,14 +329,15 @@ async def detect_anomalies(
     
     Returns detected anomalies with severity scores and timestamps.
     """
+    start_time = datetime.utcnow()
+    response_builder = AnalyticsResponseBuilder()
+    
     try:
-        # Validate instrument
+        # Get instrument (validation decorator already confirmed it exists)
         result = await session.execute(
             select(Instrument).where(Instrument.id == instrument_id)
         )
-        instrument = result.scalar_one_or_none()
-        if not instrument:
-            raise HTTPException(status_code=404, detail="Instrument not found")
+        instrument = result.scalar_one()
         
         # Detect anomalies
         anomalies = await ml_service.detect_anomalies(instrument_id, lookback_hours)
@@ -294,16 +359,29 @@ async def detect_anomalies(
             ]
         }
         
-        return JSONResponse(content=response_data)
+        # Calculate performance metrics
+        processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+        data_points = len(anomalies)
         
-    except HTTPException:
+        # Build standardized response
+        return response_builder.success(response_data) \
+            .with_performance_metrics(processing_time, data_points) \
+            .with_model_metadata("anomaly_detector", "1.0") \
+            .build()
+        
+    except StandardAPIError:
         raise
     except Exception as e:
         logger.error(f"Error detecting anomalies: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise SystemError(
+            error_code="ANALYTICS_008", 
+            message="Failed to detect market anomalies",
+            details={"instrument_id": instrument_id, "error": str(e)}
+        )
 
 
 @router.get("/trend-classification/{instrument_id}")
+@validate_instrument_exists
 async def classify_trend(
     instrument_id: int = Path(..., description="Instrument ID"),
     session=Depends(get_db_session)
@@ -313,14 +391,15 @@ async def classify_trend(
     
     Returns trend classification (bullish, bearish, sideways) with confidence.
     """
+    start_time = datetime.utcnow()
+    response_builder = AnalyticsResponseBuilder()
+    
     try:
-        # Validate instrument
+        # Get instrument (validation decorator already confirmed it exists)
         result = await session.execute(
             select(Instrument).where(Instrument.id == instrument_id)
         )
-        instrument = result.scalar_one_or_none()
-        if not instrument:
-            raise HTTPException(status_code=404, detail="Instrument not found")
+        instrument = result.scalar_one()
         
         # Classify trend
         trend_result = await ml_service.classify_trend(instrument_id)
@@ -332,16 +411,30 @@ async def classify_trend(
             **trend_result
         }
         
-        return JSONResponse(content=response_data)
+        # Calculate performance metrics
+        processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
         
-    except HTTPException:
+        # Build standardized response
+        return response_builder.success(response_data) \
+            .with_performance_metrics(processing_time, 1) \
+            .with_confidence_score(trend_result.get("confidence", 1.0)) \
+            .with_model_metadata("trend_classifier", "1.0") \
+            .build()
+        
+    except StandardAPIError:
         raise
     except Exception as e:
         logger.error(f"Error classifying trend: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise SystemError(
+            error_code="ANALYTICS_009", 
+            message="Failed to classify market trend",
+            details={"instrument_id": instrument_id, "error": str(e)}
+        )
 
 
 @router.post("/calculate-var")
+@validate_instrument_exists
+@validate_confidence_level(allowed=[0.90, 0.95, 0.99, 0.999])
 async def calculate_var(request: RiskRequest, session=Depends(get_db_session)):
     """
     Calculate Value at Risk (VaR) for a position.
@@ -349,24 +442,31 @@ async def calculate_var(request: RiskRequest, session=Depends(get_db_session)):
     Methods: historical, parametric, monte_carlo
     Confidence levels: 0.90, 0.95, 0.99, 0.999
     """
+    start_time = datetime.utcnow()
+    response_builder = AnalyticsResponseBuilder()
+    
     try:
-        # Validate instrument
+        # Get instrument (validation decorator already confirmed it exists)
         result = await session.execute(
             select(Instrument).where(Instrument.id == request.instrument_id)
         )
-        instrument = result.scalar_one_or_none()
-        if not instrument:
-            raise HTTPException(status_code=404, detail="Instrument not found")
+        instrument = result.scalar_one()
         
-        # Convert confidence level
-        if request.confidence_level == 0.95:
-            confidence_enum = ConfidenceLevel.NINETY_FIVE
-        elif request.confidence_level == 0.99:
-            confidence_enum = ConfidenceLevel.NINETY_NINE
-        elif request.confidence_level == 0.999:
-            confidence_enum = ConfidenceLevel.NINETY_NINE_NINE
-        else:
-            raise HTTPException(status_code=400, detail="Invalid confidence level")
+        # Convert confidence level to enum
+        confidence_enum_map = {
+            0.90: ConfidenceLevel.NINETY,
+            0.95: ConfidenceLevel.NINETY_FIVE,
+            0.99: ConfidenceLevel.NINETY_NINE,
+            0.999: ConfidenceLevel.NINETY_NINE_NINE
+        }
+        
+        confidence_enum = confidence_enum_map.get(request.confidence_level)
+        if not confidence_enum:
+            raise ValidationError(
+                error_code="ANALYTICS_010",
+                message="Invalid confidence level for VaR calculation",
+                details={"provided": request.confidence_level, "supported": list(confidence_enum_map.keys())}
+            )
         
         # Calculate VaR
         var_result = await risk_calculator.calculate_var(
@@ -378,7 +478,11 @@ async def calculate_var(request: RiskRequest, session=Depends(get_db_session)):
         )
         
         if not var_result:
-            raise HTTPException(status_code=404, detail="Unable to calculate VaR")
+            raise ValidationError(
+                error_code="ANALYTICS_011",
+                message="Unable to calculate VaR",
+                details={"instrument_id": request.instrument_id, "reason": "insufficient_data"}
+            )
         
         response_data = {
             "timestamp": var_result.timestamp.isoformat(),
@@ -394,16 +498,27 @@ async def calculate_var(request: RiskRequest, session=Depends(get_db_session)):
             "metadata": var_result.metadata
         }
         
-        return JSONResponse(content=response_data)
+        # Calculate performance metrics
+        processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
         
-    except HTTPException:
+        # Build standardized response
+        return response_builder.success(response_data) \
+            .with_performance_metrics(processing_time, 1) \
+            .build()
+        
+    except StandardAPIError:
         raise
     except Exception as e:
         logger.error(f"Error calculating VaR: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise SystemError(
+            error_code="ANALYTICS_012", 
+            message="Failed to calculate Value at Risk",
+            details={"instrument_id": request.instrument_id, "error": str(e)}
+        )
 
 
 @router.get("/risk-metrics/{instrument_id}")
+@validate_instrument_exists
 async def get_risk_metrics(
     instrument_id: int = Path(..., description="Instrument ID"),
     lookback_days: int = Query(default=252, ge=30, le=1000),
@@ -415,23 +530,29 @@ async def get_risk_metrics(
     
     Includes VaR, volatility, Sharpe ratio, max drawdown, beta, and more.
     """
+    start_time = datetime.utcnow()
+    response_builder = AnalyticsResponseBuilder()
+    
     try:
-        # Validate instrument
+        # Get instrument (validation decorator already confirmed it exists)
         result = await session.execute(
             select(Instrument).where(Instrument.id == instrument_id)
         )
-        instrument = result.scalar_one_or_none()
-        if not instrument:
-            raise HTTPException(status_code=404, detail="Instrument not found")
+        instrument = result.scalar_one()
         
         # Validate benchmark if provided
+        benchmark = None
         if benchmark_id:
             result = await session.execute(
                 select(Instrument).where(Instrument.id == benchmark_id)
             )
             benchmark = result.scalar_one_or_none()
             if not benchmark:
-                raise HTTPException(status_code=404, detail="Benchmark instrument not found")
+                raise ValidationError(
+                    error_code="ANALYTICS_013",
+                    message="Benchmark instrument not found",
+                    details={"benchmark_id": benchmark_id}
+                )
         
         # Calculate risk metrics
         risk_metrics = await risk_calculator.calculate_comprehensive_risk_metrics(
@@ -439,7 +560,11 @@ async def get_risk_metrics(
         )
         
         if not risk_metrics:
-            raise HTTPException(status_code=404, detail="Unable to calculate risk metrics")
+            raise ValidationError(
+                error_code="ANALYTICS_014",
+                message="Unable to calculate risk metrics",
+                details={"instrument_id": instrument_id, "reason": "insufficient_data"}
+            )
         
         response_data = {
             "timestamp": risk_metrics.timestamp.isoformat(),
@@ -466,20 +591,32 @@ async def get_risk_metrics(
                 "data_period_days": risk_metrics.data_period_days,
                 "lookback_days_requested": lookback_days,
                 "benchmark_id": benchmark_id,
+                "benchmark_symbol": benchmark.symbol if benchmark else None,
                 "last_updated": risk_metrics.last_updated.isoformat()
             }
         }
         
-        return JSONResponse(content=response_data)
+        # Calculate performance metrics
+        processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
         
-    except HTTPException:
+        # Build standardized response
+        return response_builder.success(response_data) \
+            .with_performance_metrics(processing_time, len(risk_metrics.risk_metrics)) \
+            .build()
+        
+    except StandardAPIError:
         raise
     except Exception as e:
         logger.error(f"Error getting risk metrics: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise SystemError(
+            error_code="ANALYTICS_015", 
+            message="Failed to calculate comprehensive risk metrics",
+            details={"instrument_id": instrument_id, "error": str(e)}
+        )
 
 
 @router.post("/stress-test")
+@validate_instrument_exists
 async def perform_stress_test(
     request: StressTestRequest,
     session=Depends(get_db_session)
@@ -489,14 +626,15 @@ async def perform_stress_test(
     
     Tests various market shock scenarios and estimates recovery times.
     """
+    start_time = datetime.utcnow()
+    response_builder = AnalyticsResponseBuilder()
+    
     try:
-        # Validate instrument
+        # Get instrument (validation decorator already confirmed it exists)
         result = await session.execute(
             select(Instrument).where(Instrument.id == request.instrument_id)
         )
-        instrument = result.scalar_one_or_none()
-        if not instrument:
-            raise HTTPException(status_code=404, detail="Instrument not found")
+        instrument = result.scalar_one()
         
         # Perform stress test
         stress_results = await risk_calculator.perform_stress_test(
@@ -523,16 +661,28 @@ async def perform_stress_test(
             ]
         }
         
-        return JSONResponse(content=response_data)
+        # Calculate performance metrics
+        processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
         
-    except HTTPException:
+        # Build standardized response
+        return response_builder.success(response_data) \
+            .with_performance_metrics(processing_time, len(stress_results)) \
+            .build()
+        
+    except StandardAPIError:
         raise
     except Exception as e:
         logger.error(f"Error performing stress test: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise SystemError(
+            error_code="ANALYTICS_016", 
+            message="Failed to perform stress test",
+            details={"instrument_id": request.instrument_id, "error": str(e)}
+        )
 
 
 @router.post("/volume-profile")
+@validate_instrument_exists
+@validate_lookback_hours(min_hours=1, max_hours=168)
 async def get_volume_profile(
     request: VolumeProfileRequest,
     session=Depends(get_db_session)
@@ -542,14 +692,15 @@ async def get_volume_profile(
     
     Returns Point of Control (POC), value area, and volume distribution.
     """
+    start_time = datetime.utcnow()
+    response_builder = AnalyticsResponseBuilder()
+    
     try:
-        # Validate instrument
+        # Get instrument (validation decorator already confirmed it exists)
         result = await session.execute(
             select(Instrument).where(Instrument.id == request.instrument_id)
         )
-        instrument = result.scalar_one_or_none()
-        if not instrument:
-            raise HTTPException(status_code=404, detail="Instrument not found")
+        instrument = result.scalar_one()
         
         # Get volume profile
         volume_profile = await market_data_processor.analyze_volume_profile(
@@ -557,7 +708,11 @@ async def get_volume_profile(
         )
         
         if not volume_profile:
-            raise HTTPException(status_code=404, detail="Unable to generate volume profile")
+            raise ValidationError(
+                error_code="ANALYTICS_021",
+                message="Unable to generate volume profile",
+                details={"instrument_id": request.instrument_id, "reason": "insufficient_data"}
+            )
         
         response_data = {
             "timestamp": volume_profile.timestamp.isoformat(),
@@ -573,13 +728,23 @@ async def get_volume_profile(
             "price_bins": len(volume_profile.price_levels)
         }
         
-        return JSONResponse(content=response_data)
+        # Calculate performance metrics
+        processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
         
-    except HTTPException:
+        # Build standardized response
+        return response_builder.success(response_data) \
+            .with_performance_metrics(processing_time, len(volume_profile.price_levels)) \
+            .build()
+        
+    except StandardAPIError:
         raise
     except Exception as e:
         logger.error(f"Error getting volume profile: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise SystemError(
+            error_code="ANALYTICS_022", 
+            message="Failed to generate volume profile",
+            details={"instrument_id": request.instrument_id, "error": str(e)}
+        )
 
 
 @router.get("/correlation-matrix")
@@ -593,9 +758,16 @@ async def get_correlation_matrix(
     
     Returns correlation coefficients, eigenvalues, and condition number.
     """
+    start_time = datetime.utcnow()
+    response_builder = AnalyticsResponseBuilder()
+    
     try:
         if len(instrument_ids) < 2:
-            raise HTTPException(status_code=400, detail="At least 2 instruments required")
+            raise ValidationError(
+                error_code="ANALYTICS_017",
+                message="At least 2 instruments required for correlation matrix",
+                details={"provided_count": len(instrument_ids)}
+            )
         
         # Validate all instruments exist
         result = await session.execute(
@@ -606,9 +778,10 @@ async def get_correlation_matrix(
         
         missing_ids = set(instrument_ids) - set(found_ids)
         if missing_ids:
-            raise HTTPException(
-                status_code=404, 
-                detail=f"Instruments not found: {list(missing_ids)}"
+            raise ValidationError(
+                error_code="ANALYTICS_018",
+                message="Some instruments not found",
+                details={"missing_instrument_ids": list(missing_ids)}
             )
         
         # Calculate correlation matrix
@@ -617,7 +790,11 @@ async def get_correlation_matrix(
         )
         
         if not correlation_result:
-            raise HTTPException(status_code=404, detail="Unable to calculate correlation matrix")
+            raise ValidationError(
+                error_code="ANALYTICS_019",
+                message="Unable to calculate correlation matrix",
+                details={"instrument_ids": instrument_ids, "reason": "insufficient_data"}
+            )
         
         # Create instrument symbol mapping
         symbol_map = {inst.id: inst.symbol for inst in instruments}
@@ -633,16 +810,28 @@ async def get_correlation_matrix(
             "requested_lookback_days": lookback_days
         }
         
-        return JSONResponse(content=response_data)
+        # Calculate performance metrics
+        processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+        matrix_size = len(instrument_ids)
         
-    except HTTPException:
+        # Build standardized response
+        return response_builder.success(response_data) \
+            .with_performance_metrics(processing_time, matrix_size) \
+            .build()
+        
+    except StandardAPIError:
         raise
     except Exception as e:
         logger.error(f"Error calculating correlation matrix: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise SystemError(
+            error_code="ANALYTICS_020", 
+            message="Failed to calculate correlation matrix",
+            details={"instrument_ids": instrument_ids, "error": str(e)}
+        )
 
 
 @router.get("/market-microstructure/{instrument_id}")
+@validate_instrument_exists
 async def get_market_microstructure(
     instrument_id: int = Path(..., description="Instrument ID"),
     lookback_minutes: int = Query(default=60, ge=5, le=1440),
@@ -653,14 +842,15 @@ async def get_market_microstructure(
     
     Returns bid-ask spreads, market impact, and order flow metrics.
     """
+    start_time = datetime.utcnow()
+    response_builder = AnalyticsResponseBuilder()
+    
     try:
-        # Validate instrument
+        # Get instrument (validation decorator already confirmed it exists)
         result = await session.execute(
             select(Instrument).where(Instrument.id == instrument_id)
         )
-        instrument = result.scalar_one_or_none()
-        if not instrument:
-            raise HTTPException(status_code=404, detail="Instrument not found")
+        instrument = result.scalar_one()
         
         # Get microstructure analysis
         microstructure = await market_data_processor.calculate_market_microstructure(
@@ -668,7 +858,11 @@ async def get_market_microstructure(
         )
         
         if not microstructure:
-            raise HTTPException(status_code=404, detail="Unable to calculate market microstructure")
+            raise ValidationError(
+                error_code="ANALYTICS_023",
+                message="Unable to calculate market microstructure",
+                details={"instrument_id": instrument_id, "reason": "insufficient_data"}
+            )
         
         response_data = {
             "timestamp": microstructure.timestamp.isoformat(),
@@ -685,19 +879,32 @@ async def get_market_microstructure(
             }
         }
         
-        return JSONResponse(content=response_data)
+        # Calculate performance metrics
+        processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
         
-    except HTTPException:
+        # Build standardized response
+        return response_builder.success(response_data) \
+            .with_performance_metrics(processing_time, 6) \
+            .build()
+        
+    except StandardAPIError:
         raise
     except Exception as e:
         logger.error(f"Error getting market microstructure: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise SystemError(
+            error_code="ANALYTICS_024", 
+            message="Failed to calculate market microstructure",
+            details={"instrument_id": instrument_id, "error": str(e)}
+        )
 
 
+# Health check endpoint
 # Health check endpoint
 @router.get("/health")
 async def health_check():
     """Health check endpoint for analytics services."""
+    response_builder = AnalyticsResponseBuilder()
+    
     try:
         # Check service availability
         services_status = {
@@ -707,19 +914,18 @@ async def health_check():
             "market_data_processor": "available"
         }
         
-        return JSONResponse(content={
+        health_data = {
             "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
             "services": services_status
-        })
+        }
+        
+        return response_builder.success(health_data).build()
         
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={
-                "status": "unhealthy",
-                "timestamp": datetime.utcnow().isoformat(),
-                "error": str(e)
-            }
+        raise SystemError(
+            error_code="ANALYTICS_025",
+            message="Analytics health check failed", 
+            details={"error": str(e)}
         )

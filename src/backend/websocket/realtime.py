@@ -7,6 +7,7 @@ alert notifications, and system status updates with <100ms delivery targets.
 
 import asyncio
 import json
+import time
 from datetime import datetime
 from typing import Dict, Set, Optional, Any, List
 
@@ -15,13 +16,20 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 from ..config import settings
+from .message_types import (
+    WebSocketMessage as TypedWebSocketMessage, OutgoingMessage,
+    MarketDataMessage, MarketDataUpdate, AlertMessage, AlertNotification,
+    AnalyticsMessage, AnalyticsUpdate, TechnicalIndicatorMessage, TechnicalIndicatorUpdate,
+    ConnectionMessage, ConnectionStatus, ErrorMessage, ErrorDetails
+)
+from .message_handler import MessageHandler
 
 logger = structlog.get_logger()
 router = APIRouter()
 
 
 class WebSocketMessage(BaseModel):
-    """Base model for WebSocket messages."""
+    """Legacy base model for WebSocket messages - kept for backward compatibility."""
     type: str
     timestamp: datetime
     data: Dict[str, Any]
@@ -29,18 +37,26 @@ class WebSocketMessage(BaseModel):
 
 class ConnectionManager:
     """
-    WebSocket connection manager.
+    Enhanced WebSocket connection manager with typed message support.
     
     Manages active WebSocket connections for real-time broadcasting
-    of market data, alerts, and system status updates.
+    of market data, alerts, and system status updates with comprehensive
+    message validation and performance optimization.
     """
     
     def __init__(self):
-        self.active_connections: Set[WebSocket] = set()
+        self.active_connections: Dict[str, WebSocket] = {}  # client_id -> websocket
+        self.client_subscriptions: Dict[str, Set[str]] = {}  # client_id -> subscription types
         self.connection_count = 0
         self.max_connections = settings.MAX_WEBSOCKET_CONNECTIONS
+        self.message_handler = MessageHandler()
+        self.performance_metrics = {
+            "messages_sent": 0,
+            "broadcast_times": [],
+            "average_broadcast_time": 0.0
+        }
     
-    async def connect(self, websocket: WebSocket) -> bool:
+    async def connect(self, websocket: WebSocket, client_id: Optional[str] = None) -> tuple[bool, str]:
         """
         Accept new WebSocket connection.
         
@@ -52,37 +68,61 @@ class ConnectionManager:
         """
         if len(self.active_connections) >= self.max_connections:
             logger.warning(f"WebSocket connection rejected: at capacity ({self.max_connections})")
-            return False
+            return False, ""
+        
+        # Generate client ID if not provided
+        if not client_id:
+            client_id = f"client_{self.connection_count + 1}_{int(time.time())}"
         
         await websocket.accept()
-        self.active_connections.add(websocket)
+        self.active_connections[client_id] = websocket
+        self.client_subscriptions[client_id] = set()
         self.connection_count += 1
         
-        logger.info(f"WebSocket connection accepted. Active connections: {len(self.active_connections)}")
+        logger.info(f"WebSocket connection accepted for {client_id}. Active connections: {len(self.active_connections)}")
         
-        # Send welcome message
-        await self.send_personal_message(websocket, {
-            "type": "connection_established",
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": {
-                "connection_id": self.connection_count,
-                "server_time": datetime.utcnow().isoformat(),
-                "active_connections": len(self.active_connections)
-            }
-        })
+        # Send typed welcome message
+        welcome_message = ConnectionMessage(
+            data=ConnectionStatus(
+                client_id=client_id,
+                connected_at=datetime.utcnow(),
+                subscriptions=[],
+                last_heartbeat=datetime.utcnow(),
+                connection_quality="good"
+            )
+        )
         
-        return True
+        await self.send_personal_message(welcome_message, client_id)
+        
+        return True, client_id
     
-    def disconnect(self, websocket: WebSocket) -> None:
+    def disconnect(self, client_id: str) -> None:
         """
-        Remove WebSocket connection.
+        Remove WebSocket connection by client ID.
+        
+        Args:
+            client_id: Client identifier to disconnect.
+        """
+        if client_id in self.active_connections:
+            del self.active_connections[client_id]
+        if client_id in self.client_subscriptions:
+            del self.client_subscriptions[client_id]
+        logger.info(f"Client {client_id} disconnected. Active connections: {len(self.active_connections)}")
+    
+    def disconnect_websocket(self, websocket: WebSocket) -> None:
+        """
+        Remove WebSocket connection by websocket instance (backward compatibility).
         
         Args:
             websocket: WebSocket connection to remove.
         """
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-            logger.info(f"WebSocket connection removed. Active connections: {len(self.active_connections)}")
+        client_id = None
+        for cid, ws in self.active_connections.items():
+            if ws == websocket:
+                client_id = cid
+                break
+        if client_id:
+            self.disconnect(client_id)
     
     async def send_personal_message(self, websocket: WebSocket, message: dict) -> None:
         """
@@ -128,9 +168,19 @@ class ConnectionManager:
         if disconnected_connections:
             logger.info(f"Removed {len(disconnected_connections)} failed connections")
     
-    async def broadcast_tick_update(self, instrument_id: int, symbol: str, price: float, volume: int, timestamp: datetime) -> None:
+    async def broadcast_tick_update(
+        self, 
+        instrument_id: int, 
+        symbol: str, 
+        price: float, 
+        volume: int, 
+        timestamp: datetime,
+        bid: Optional[float] = None,
+        ask: Optional[float] = None,
+        change_percent: Optional[float] = None
+    ) -> None:
         """
-        Broadcast market tick update.
+        Broadcast typed market tick update.
         
         Args:
             instrument_id: Instrument ID.
@@ -138,63 +188,77 @@ class ConnectionManager:
             price: Current price.
             volume: Trade volume.
             timestamp: Tick timestamp.
+            bid: Bid price (optional).
+            ask: Ask price (optional).
+            change_percent: Price change percentage (optional).
         """
-        message = {
-            "type": "tick_update",
-            "timestamp": timestamp.isoformat(),
-            "data": {
-                "instrument_id": instrument_id,
-                "symbol": symbol,
-                "price": price,
-                "volume": volume,
-                "timestamp": timestamp.isoformat()
-            }
-        }
-        await self.broadcast(message)
+        message = MarketDataMessage(
+            data=MarketDataUpdate(
+                instrument_id=instrument_id,
+                symbol=symbol,
+                price=price,
+                volume=volume,
+                timestamp=timestamp,
+                bid=bid,
+                ask=ask,
+                change_percent=change_percent
+            )
+        )
+        await self.broadcast_message(message, "market_data")
     
     async def broadcast_alert_fired(
         self,
+        alert_id: int,
         rule_id: int,
         instrument_id: int,
         symbol: str,
+        rule_name: str,
         trigger_value: float,
         threshold_value: float,
         condition: str,
         timestamp: datetime,
-        evaluation_time_ms: Optional[int] = None
+        evaluation_time_ms: Optional[int] = None,
+        severity: str = "medium",
+        message_text: str = "Alert condition triggered"
     ) -> None:
         """
-        Broadcast alert firing notification.
+        Broadcast typed alert firing notification.
         
         Args:
+            alert_id: Alert ID.
             rule_id: Rule ID that fired.
             instrument_id: Instrument ID.
             symbol: Instrument symbol.
+            rule_name: Name of the rule.
             trigger_value: Value that triggered the alert.
             threshold_value: Threshold from the rule.
             condition: Rule condition.
             timestamp: Alert timestamp.
             evaluation_time_ms: Rule evaluation time.
+            severity: Alert severity level.
+            message_text: Alert message text.
         """
-        message = {
-            "type": "alert_fired",
-            "timestamp": timestamp.isoformat(),
-            "data": {
-                "rule_id": rule_id,
-                "instrument_id": instrument_id,
-                "symbol": symbol,
-                "trigger_value": trigger_value,
-                "threshold_value": threshold_value,
-                "condition": condition,
-                "timestamp": timestamp.isoformat(),
-                "evaluation_time_ms": evaluation_time_ms
-            }
-        }
-        await self.broadcast(message)
+        message = AlertMessage(
+            data=AlertNotification(
+                alert_id=alert_id,
+                rule_id=rule_id,
+                instrument_id=instrument_id,
+                symbol=symbol,
+                rule_name=rule_name,
+                condition=condition,
+                target_value=threshold_value,
+                current_value=trigger_value,
+                severity=severity,
+                message=message_text,
+                evaluation_time_ms=evaluation_time_ms,
+                rule_condition=condition
+            )
+        )
+        await self.broadcast_message(message, "alerts")
     
     async def broadcast_health_status(self, status: dict) -> None:
         """
-        Broadcast system health status.
+        Broadcast system health status (legacy method).
         
         Args:
             status: Health status data.
@@ -205,6 +269,63 @@ class ConnectionManager:
             "data": status
         }
         await self.broadcast(message)
+        
+    async def broadcast_analytics_update(
+        self,
+        instrument_id: int,
+        symbol: str,
+        analysis_type: str,
+        results: Dict[str, Any],
+        confidence_score: Optional[float] = None
+    ) -> None:
+        """
+        Broadcast typed analytics update.
+        
+        Args:
+            instrument_id: Instrument ID.
+            symbol: Instrument symbol.
+            analysis_type: Type of analysis.
+            results: Analysis results.
+            confidence_score: Analysis confidence score.
+        """
+        message = AnalyticsMessage(
+            data=AnalyticsUpdate(
+                instrument_id=instrument_id,
+                symbol=symbol,
+                analysis_type=analysis_type,
+                results=results,
+                calculation_time=datetime.utcnow(),
+                confidence_score=confidence_score
+            )
+        )
+        await self.broadcast_message(message, f"analytics_{instrument_id}")
+    
+    async def broadcast_technical_indicators(
+        self,
+        instrument_id: int,
+        symbol: str,
+        indicators: Dict[str, Any],
+        timeframe: str = "1min"
+    ) -> None:
+        """
+        Broadcast typed technical indicator update.
+        
+        Args:
+            instrument_id: Instrument ID.
+            symbol: Instrument symbol.
+            indicators: Technical indicators data.
+            timeframe: Analysis timeframe.
+        """
+        message = TechnicalIndicatorMessage(
+            data=TechnicalIndicatorUpdate(
+                instrument_id=instrument_id,
+                symbol=symbol,
+                indicators=indicators,
+                calculated_at=datetime.utcnow(),
+                timeframe=timeframe
+            )
+        )
+        await self.broadcast_message(message, f"technical_indicators_{instrument_id}")
     
     async def broadcast_rule_triggered(self, rule_id: int, match_details: dict, evaluation_time: int) -> None:
         """
@@ -490,7 +611,7 @@ class ConnectionManager:
     
     async def send_historical_data_stream(
         self,
-        websocket,
+        client_id: str,
         query_id: str,
         symbol: str,
         bars_data: List[Dict[str, Any]],
@@ -508,6 +629,7 @@ class ConnectionManager:
                 chunk_number = chunks_sent + 1
                 total_chunks = (total_bars + chunk_size - 1) // chunk_size
                 
+                # Use legacy WebSocketMessage for historical data chunks
                 message = WebSocketMessage(
                     type="historical_data_chunk",
                     timestamp=datetime.now(),
@@ -521,7 +643,17 @@ class ConnectionManager:
                     }
                 )
                 
-                await self.send_personal_message(websocket, message)
+                # Convert to dict for legacy send method
+                message_dict = {
+                    "type": message.type,
+                    "timestamp": message.timestamp.isoformat(),
+                    "data": message.data
+                }
+                
+                if client_id in self.active_connections:
+                    websocket = self.active_connections[client_id]
+                    await websocket.send_text(json.dumps(message_dict, default=str))
+                
                 chunks_sent += 1
                 
                 # Small delay to prevent overwhelming the client
@@ -543,16 +675,16 @@ manager = ConnectionManager()
 @router.websocket("/realtime")
 async def websocket_endpoint(websocket: WebSocket):
     """
-    WebSocket endpoint for real-time data and alert streaming.
+    Enhanced WebSocket endpoint for real-time data and alert streaming.
     
     Provides real-time streaming of market data, alerts, and system status
-    with <100ms delivery target for connected clients.
+    with <50ms delivery target for connected clients using typed message system.
     
     Args:
         websocket: WebSocket connection.
     """
-    # Attempt to accept connection
-    connection_accepted = await manager.connect(websocket)
+    # Attempt to accept connection with client ID
+    connection_accepted, client_id = await manager.connect(websocket)
     
     if not connection_accepted:
         await websocket.close(code=1000, reason="Server at capacity")
@@ -568,83 +700,54 @@ async def websocket_endpoint(websocket: WebSocket):
                 # Parse client message
                 try:
                     client_message = json.loads(data)
-                    await handle_client_message(websocket, client_message)
+                    await manager.handle_client_message(websocket, client_id, client_message)
                 except json.JSONDecodeError:
-                    await manager.send_personal_message(websocket, {
-                        "type": "error",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "data": {
-                            "message": "Invalid JSON format",
-                            "received": data
-                        }
-                    })
+                    error_msg = await manager.message_handler.create_error_message(
+                        "INVALID_JSON",
+                        "Invalid JSON format",
+                        None,
+                        "error"
+                    )
+                    await manager.send_personal_message(error_msg, client_id)
                 
             except WebSocketDisconnect:
                 break
             
             except Exception as e:
-                logger.error(f"WebSocket error: {e}")
-                await manager.send_personal_message(websocket, {
-                    "type": "error",
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "data": {
-                        "message": "Internal server error",
-                        "error": str(e)
-                    }
-                })
+                logger.error(f"WebSocket error for client {client_id}: {e}")
+                error_msg = await manager.message_handler.create_error_message(
+                    "INTERNAL_ERROR",
+                    "Internal server error",
+                    None,
+                    "critical"
+                )
+                await manager.send_personal_message(error_msg, client_id)
                 break
     
     finally:
-        manager.disconnect(websocket)
+        manager.disconnect(client_id)
 
 
-async def handle_client_message(websocket: WebSocket, message: dict) -> None:
-    """
-    Handle incoming client WebSocket messages.
-    
-    Args:
-        websocket: Client WebSocket connection.
-        message: Parsed client message.
-    """
-    message_type = message.get("type", "unknown")
-    
-    if message_type == "ping":
-        # Respond to ping with pong
-        await manager.send_personal_message(websocket, {
-            "type": "pong",
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": {"server_time": datetime.utcnow().isoformat()}
-        })
-    
-    elif message_type == "subscribe":
-        # Handle subscription requests (future enhancement)
-        await manager.send_personal_message(websocket, {
-            "type": "subscription_acknowledged",
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": {
-                "subscribed_to": message.get("data", {}),
-                "status": "active"
-            }
-        })
-    
-    else:
-        # Unknown message type
-        await manager.send_personal_message(websocket, {
-            "type": "error",
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": {
-                "message": f"Unknown message type: {message_type}",
-                "supported_types": ["ping", "subscribe"]
-            }
-        })
+# Legacy handle_client_message function removed - now handled by ConnectionManager.handle_client_message
 
 
 # Export manager for use by other services
 def get_websocket_manager() -> ConnectionManager:
     """
-    Get the global WebSocket connection manager.
+    Get the enhanced global WebSocket connection manager.
     
     Returns:
-        ConnectionManager: Global connection manager instance.
+        ConnectionManager: Enhanced global connection manager instance with typed message support.
     """
     return manager
+
+
+# Performance monitoring endpoint for connection manager
+def get_websocket_performance_metrics() -> Dict[str, Any]:
+    """
+    Get comprehensive WebSocket performance metrics.
+    
+    Returns:
+        Dictionary containing connection and message processing metrics.
+    """
+    return manager.get_performance_metrics()

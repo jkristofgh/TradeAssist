@@ -450,10 +450,10 @@ class MLModelsService:
     @with_db_session
     @handle_db_errors("Market data retrieval for prediction")
     async def _get_market_data_for_prediction(self, session, instrument_id: int, lookback_hours: int) -> Optional[pd.DataFrame]:
-    """Get market data from database for ML prediction."""
-    cutoff_time = datetime.utcnow() - timedelta(hours=lookback_hours)
-    
-    result = await session.execute(
+        """Get market data from database for ML prediction."""
+        cutoff_time = datetime.utcnow() - timedelta(hours=lookback_hours)
+        
+        result = await session.execute(
         select(MarketData)
         .where(
             and_(
@@ -462,31 +462,31 @@ class MLModelsService:
             )
         )
         .order_by(MarketData.timestamp)
-    )
-    
-    records = result.scalars().all()
-    
-    if not records:
-        return None
-    
-    # Convert to DataFrame
-    data = []
-    for record in records:
-        data.append({
-            'timestamp': record.timestamp,
-            'open': float(record.price) if record.price else 0.0,
-            'high': float(record.price) if record.price else 0.0,
-            'low': float(record.price) if record.price else 0.0,
-            'close': float(record.price) if record.price else 0.0,
-            'volume': record.volume if record.volume else 0
-        })
-    
-    df = pd.DataFrame(data)
-    if df.empty:
-        return None
-    
-    df.set_index('timestamp', inplace=True)
-    return df
+        )
+        
+        records = result.scalars().all()
+        
+        if not records:
+            return None
+        
+        # Convert to DataFrame
+        data = []
+        for record in records:
+            data.append({
+                'timestamp': record.timestamp,
+                'open': float(record.price) if record.price else 0.0,
+                'high': float(record.price) if record.price else 0.0,
+                'low': float(record.price) if record.price else 0.0,
+                'close': float(record.price) if record.price else 0.0,
+                'volume': record.volume if record.volume else 0
+            })
+        
+        df = pd.DataFrame(data)
+        if df.empty:
+            return None
+        
+        df.set_index('timestamp', inplace=True)
+        return df
     
     async def _add_technical_features(self, df: pd.DataFrame) -> None:
         """Add technical indicators as features to DataFrame."""

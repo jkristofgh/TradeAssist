@@ -7,17 +7,40 @@
 
 import React, { createContext, useContext, useEffect, useReducer, useCallback, useRef } from 'react';
 import { 
-  WebSocketIncomingMessage, 
+  IncomingMessage, 
+  OutgoingMessage,
+  WebSocketPerformanceMetrics,
+  WebSocketSubscriptions,
+  SubscriptionState,
+  isValidIncomingMessage,
+  isMarketDataMessage,
+  isAnalyticsMessage,
+  isTechnicalIndicatorMessage,
+  isAlertMessage,
+  isPricePredictionMessage,
+  isRiskMetricsMessage,
+  isConnectionMessage,
+  isErrorMessage,
+  isPongMessage,
+  createPingMessage,
+  createSubscriptionMessage,
+  createUnsubscriptionMessage,
+  MarketDataUpdate,
+  AnalyticsUpdate,
+  TechnicalIndicatorUpdate,
+  AlertNotification,
+  PricePredictionUpdate,
+  RiskMetricsUpdate
+} from '../types/websocket';
+import { 
   WebSocketState, 
-  TickUpdateMessage, 
-  AlertFiredMessage, 
-  HealthStatusMessage,
   MarketData,
   AlertLogWithDetails,
   HealthStatus,
   AlertStatus,
   DeliveryStatus
 } from '../types';
+import { snakeToCamel } from '../utils/typeTransforms';
 
 // =============================================================================
 // STATE MANAGEMENT
@@ -27,16 +50,22 @@ interface WebSocketContextState extends WebSocketState {
   realtimeData: Record<number, MarketData>;
   recentAlerts: AlertLogWithDetails[];
   systemHealth: HealthStatus | null;
+  analyticsData: Record<number, AnalyticsUpdate>;
+  technicalIndicators: Record<number, TechnicalIndicatorUpdate>;
+  pricePredictions: Record<number, PricePredictionUpdate>;
+  riskMetrics: Record<number, RiskMetricsUpdate>;
+  subscriptions: WebSocketSubscriptions;
+  performanceMetrics: WebSocketPerformanceMetrics;
+  clientId?: string;
 }
 
 type WebSocketAction = 
-  | { type: 'CONNECT' }
+  | { type: 'CONNECT'; payload: { clientId: string } }
   | { type: 'DISCONNECT' }
   | { type: 'RECONNECTING' }
   | { type: 'ERROR'; payload: string }
-  | { type: 'TICK_UPDATE'; payload: TickUpdateMessage['data'] }
-  | { type: 'ALERT_FIRED'; payload: AlertFiredMessage['data'] }
-  | { type: 'HEALTH_STATUS'; payload: HealthStatus }
+  | { type: 'MESSAGE_RECEIVED'; payload: { message: IncomingMessage; processingTime: number } }
+  | { type: 'SUBSCRIPTION_UPDATED'; payload: { subscriptionType: string; status: SubscriptionState['status']; error?: string } }
   | { type: 'RESET_RECONNECT_ATTEMPTS' };
 
 const initialState: WebSocketContextState = {
@@ -45,6 +74,17 @@ const initialState: WebSocketContextState = {
   realtimeData: {},
   recentAlerts: [],
   systemHealth: null,
+  analyticsData: {},
+  technicalIndicators: {},
+  pricePredictions: {},
+  riskMetrics: {},
+  subscriptions: {},
+  performanceMetrics: {
+    messagesReceived: 0,
+    averageProcessingTime: 0,
+    errorRate: 0,
+    connectionQuality: 'disconnected'
+  },
   error: null
 };
 
@@ -55,13 +95,22 @@ function websocketReducer(state: WebSocketContextState, action: WebSocketAction)
         ...state,
         isConnected: true,
         error: null,
-        reconnectAttempts: 0
+        reconnectAttempts: 0,
+        clientId: action.payload.clientId,
+        performanceMetrics: {
+          ...state.performanceMetrics,
+          connectionQuality: 'good'
+        }
       };
     
     case 'DISCONNECT':
       return {
         ...state,
-        isConnected: false
+        isConnected: false,
+        performanceMetrics: {
+          ...state.performanceMetrics,
+          connectionQuality: 'disconnected'
+        }
       };
     
     case 'RECONNECTING':
@@ -75,62 +124,124 @@ function websocketReducer(state: WebSocketContextState, action: WebSocketAction)
       return {
         ...state,
         isConnected: false,
-        error: action.payload
-      };
-    
-    case 'TICK_UPDATE':
-      const tickData = action.payload;
-      const marketData: MarketData = {
-        id: Date.now(), // Temporary ID for real-time data
-        timestamp: tickData.timestamp,
-        instrument_id: tickData.instrument_id,
-        price: tickData.price,
-        volume: tickData.volume || null,
-        bid: tickData.bid || null,
-        ask: tickData.ask || null,
-        bid_size: null,
-        ask_size: null,
-        open_price: null,
-        high_price: null,
-        low_price: null
-      };
-      
-      return {
-        ...state,
-        realtimeData: {
-          ...state.realtimeData,
-          [tickData.instrument_id]: marketData
+        error: action.payload,
+        performanceMetrics: {
+          ...state.performanceMetrics,
+          connectionQuality: 'poor',
+          errorRate: state.performanceMetrics.errorRate + 1
         }
       };
     
-    case 'ALERT_FIRED':
-      const alertData = action.payload;
-      const newAlert: AlertLogWithDetails = {
-        id: alertData.alert_id,
-        timestamp: new Date().toISOString(),
-        rule_id: alertData.rule_id,
-        instrument_id: alertData.instrument_id,
-        trigger_value: alertData.trigger_value,
-        threshold_value: alertData.threshold_value,
-        fired_status: 'fired' as AlertStatus,
-        delivery_status: 'pending' as DeliveryStatus,
-        rule_condition: alertData.rule_condition,
-        alert_message: alertData.message,
-        evaluation_time_ms: null,
-        error_message: null,
-        delivery_attempted_at: null,
-        delivery_completed_at: null
+    case 'MESSAGE_RECEIVED':
+      const { message, processingTime } = action.payload;
+      const newState = { ...state };
+      
+      // Update performance metrics
+      const totalMessages = newState.performanceMetrics.messagesReceived + 1;
+      const avgProcessingTime = ((newState.performanceMetrics.averageProcessingTime * newState.performanceMetrics.messagesReceived) + processingTime) / totalMessages;
+      
+      newState.performanceMetrics = {
+        ...newState.performanceMetrics,
+        messagesReceived: totalMessages,
+        averageProcessingTime: avgProcessingTime,
+        lastMessageTimestamp: message.timestamp,
+        connectionQuality: avgProcessingTime < 50 ? 'excellent' : avgProcessingTime < 100 ? 'good' : 'poor'
       };
       
-      return {
-        ...state,
-        recentAlerts: [newAlert, ...state.recentAlerts.slice(0, 49)] // Keep last 50 alerts
-      };
+      // Route message to appropriate state
+      if (isMarketDataMessage(message)) {
+        const tickData = message.data;
+        const marketData: MarketData = {
+          id: Date.now(),
+          timestamp: tickData.timestamp,
+          instrumentId: tickData.instrumentId,
+          price: tickData.price,
+          volume: tickData.volume || null,
+          bid: tickData.bid || null,
+          ask: tickData.ask || null,
+          bidSize: tickData.bidSize || null,
+          askSize: tickData.askSize || null,
+          openPrice: tickData.openPrice || null,
+          highPrice: tickData.highPrice || null,
+          lowPrice: tickData.lowPrice || null
+        };
+        newState.realtimeData = {
+          ...newState.realtimeData,
+          [tickData.instrumentId]: marketData
+        };
+      }
+      
+      else if (isAnalyticsMessage(message)) {
+        newState.analyticsData = {
+          ...newState.analyticsData,
+          [message.data.instrumentId]: message.data
+        };
+      }
+      
+      else if (isTechnicalIndicatorMessage(message)) {
+        newState.technicalIndicators = {
+          ...newState.technicalIndicators,
+          [message.data.instrumentId]: message.data
+        };
+      }
+      
+      else if (isPricePredictionMessage(message)) {
+        newState.pricePredictions = {
+          ...newState.pricePredictions,
+          [message.data.instrumentId]: message.data
+        };
+      }
+      
+      else if (isRiskMetricsMessage(message)) {
+        newState.riskMetrics = {
+          ...newState.riskMetrics,
+          [message.data.instrumentId]: message.data
+        };
+      }
+      
+      else if (isAlertMessage(message)) {
+        const alertData = message.data;
+        const newAlert: AlertLogWithDetails = {
+          id: alertData.alertId,
+          timestamp: message.timestamp,
+          ruleId: alertData.ruleId,
+          instrumentId: alertData.instrumentId,
+          triggerValue: alertData.currentValue,
+          thresholdValue: alertData.targetValue,
+          firedStatus: 'fired' as AlertStatus,
+          deliveryStatus: 'pending' as DeliveryStatus,
+          ruleCondition: alertData.ruleCondition as any,
+          alertMessage: alertData.message,
+          evaluationTimeMs: alertData.evaluationTimeMs || null,
+          errorMessage: null,
+          deliveryAttemptedAt: null,
+          deliveryCompletedAt: null
+        };
+        newState.recentAlerts = [newAlert, ...newState.recentAlerts.slice(0, 49)];
+      }
+      
+      else if (isConnectionMessage(message)) {
+        // Update connection status if needed
+        if (message.data.clientId && message.data.clientId !== newState.clientId) {
+          newState.clientId = message.data.clientId;
+        }
+      }
+      
+      return newState;
     
-    case 'HEALTH_STATUS':
+    case 'SUBSCRIPTION_UPDATED':
+      const { subscriptionType, status, error } = action.payload;
       return {
         ...state,
-        systemHealth: action.payload
+        subscriptions: {
+          ...state.subscriptions,
+          [subscriptionType]: {
+            subscriptionType,
+            status,
+            lastUpdate: new Date().toISOString(),
+            errorMessage: error
+          }
+        }
       };
     
     case 'RESET_RECONNECT_ATTEMPTS':
@@ -151,7 +262,14 @@ function websocketReducer(state: WebSocketContextState, action: WebSocketAction)
 interface WebSocketContextValue extends WebSocketContextState {
   connect: () => void;
   disconnect: () => void;
-  sendMessage: (message: object) => void;
+  sendMessage: (message: OutgoingMessage) => void;
+  subscribe: (subscriptionType: string, instrumentId?: number, parameters?: Record<string, any>) => void;
+  unsubscribe: (subscriptionType: string, instrumentId?: number) => void;
+  ping: () => void;
+  getAnalyticsForInstrument: (instrumentId: number) => AnalyticsUpdate | null;
+  getTechnicalIndicatorsForInstrument: (instrumentId: number) => TechnicalIndicatorUpdate | null;
+  getPricePredictionForInstrument: (instrumentId: number) => PricePredictionUpdate | null;
+  getRiskMetricsForInstrument: (instrumentId: number) => RiskMetricsUpdate | null;
 }
 
 export const WebSocketContext = createContext<WebSocketContextValue | null>(null);
@@ -179,35 +297,45 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // =============================================================================
-  // WebSocket MESSAGE HANDLING
+  // ENHANCED MESSAGE HANDLING WITH PERFORMANCE TRACKING
   // =============================================================================
   
   const handleMessage = useCallback((event: MessageEvent) => {
+    const startTime = performance.now();
+    
     try {
-      const message: WebSocketIncomingMessage = JSON.parse(event.data);
+      // Parse raw message
+      const rawMessage = JSON.parse(event.data);
       
-      switch (message.type) {
-        case 'tick_update':
-          dispatch({ type: 'TICK_UPDATE', payload: message.data });
-          break;
-        
-        case 'alert_fired':
-          dispatch({ type: 'ALERT_FIRED', payload: message.data });
-          break;
-        
-        case 'health_status':
-          dispatch({ type: 'HEALTH_STATUS', payload: message.data });
-          break;
-        
-        case 'pong':
-          // Handle pong response (connection alive)
-          break;
-        
-        default:
-          console.warn('Unknown WebSocket message type:', message);
+      // Transform snake_case to camelCase if needed
+      const transformedMessage = snakeToCamel(rawMessage);
+      
+      // Validate message structure
+      if (!isValidIncomingMessage(transformedMessage)) {
+        console.warn('Received invalid message structure:', transformedMessage);
+        dispatch({ type: 'ERROR', payload: 'Invalid message format' });
+        return;
       }
+      
+      const processingTime = performance.now() - startTime;
+      
+      // Dispatch message with performance tracking
+      dispatch({ 
+        type: 'MESSAGE_RECEIVED', 
+        payload: { 
+          message: transformedMessage, 
+          processingTime 
+        } 
+      });
+      
+      // Log slow message processing
+      if (processingTime > 50) {
+        console.warn(`Slow message processing: ${processingTime.toFixed(2)}ms for ${transformedMessage.messageType}`);
+      }
+      
     } catch (error) {
-      console.error('Failed to parse WebSocket message:', error);
+      console.error('Failed to parse or process WebSocket message:', error);
+      dispatch({ type: 'ERROR', payload: 'Message processing error' });
     }
   }, []);
 
@@ -227,12 +355,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 
       ws.onopen = () => {
         console.log('WebSocket connected');
-        dispatch({ type: 'CONNECT' });
         
         // Start ping interval for connection health
         pingIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'ping', timestamp: new Date().toISOString() }));
+            const pingMessage = createPingMessage(Date.now());
+            ws.send(JSON.stringify(pingMessage));
           }
         }, 30000); // Ping every 30 seconds
       };
@@ -291,13 +419,68 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     dispatch({ type: 'RESET_RECONNECT_ATTEMPTS' });
   }, []);
 
-  const sendMessage = useCallback((message: object) => {
+  const sendMessage = useCallback((message: OutgoingMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(message));
+      try {
+        wsRef.current.send(JSON.stringify(message));
+      } catch (error) {
+        console.error('Failed to send WebSocket message:', error);
+        dispatch({ type: 'ERROR', payload: 'Failed to send message' });
+      }
     } else {
       console.warn('WebSocket not connected, message not sent:', message);
     }
   }, []);
+  
+  const subscribe = useCallback((subscriptionType: string, instrumentId?: number, parameters?: Record<string, any>) => {
+    const subscriptionMessage = createSubscriptionMessage(subscriptionType, instrumentId, parameters);
+    sendMessage(subscriptionMessage);
+    
+    // Update subscription state
+    dispatch({ 
+      type: 'SUBSCRIPTION_UPDATED', 
+      payload: { 
+        subscriptionType: instrumentId ? `${subscriptionType}_${instrumentId}` : subscriptionType, 
+        status: 'subscribing' 
+      } 
+    });
+  }, [sendMessage]);
+  
+  const unsubscribe = useCallback((subscriptionType: string, instrumentId?: number) => {
+    const unsubscriptionMessage = createUnsubscriptionMessage(subscriptionType, instrumentId);
+    sendMessage(unsubscriptionMessage);
+    
+    // Update subscription state
+    dispatch({ 
+      type: 'SUBSCRIPTION_UPDATED', 
+      payload: { 
+        subscriptionType: instrumentId ? `${subscriptionType}_${instrumentId}` : subscriptionType, 
+        status: 'unsubscribing' 
+      } 
+    });
+  }, [sendMessage]);
+  
+  const ping = useCallback(() => {
+    const pingMessage = createPingMessage(Date.now());
+    sendMessage(pingMessage);
+  }, [sendMessage]);
+  
+  // Utility functions for accessing typed data
+  const getAnalyticsForInstrument = useCallback((instrumentId: number): AnalyticsUpdate | null => {
+    return state.analyticsData[instrumentId] || null;
+  }, [state.analyticsData]);
+  
+  const getTechnicalIndicatorsForInstrument = useCallback((instrumentId: number): TechnicalIndicatorUpdate | null => {
+    return state.technicalIndicators[instrumentId] || null;
+  }, [state.technicalIndicators]);
+  
+  const getPricePredictionForInstrument = useCallback((instrumentId: number): PricePredictionUpdate | null => {
+    return state.pricePredictions[instrumentId] || null;
+  }, [state.pricePredictions]);
+  
+  const getRiskMetricsForInstrument = useCallback((instrumentId: number): RiskMetricsUpdate | null => {
+    return state.riskMetrics[instrumentId] || null;
+  }, [state.riskMetrics]);
 
   // =============================================================================
   // LIFECYCLE MANAGEMENT
@@ -322,11 +505,28 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   // CONTEXT VALUE
   // =============================================================================
   
+  // Handle connection messages to extract client ID
+  useEffect(() => {
+    if (isValidIncomingMessage(state) && isConnectionMessage(state)) {
+      const clientId = state.data.clientId;
+      if (clientId && clientId !== state.clientId) {
+        dispatch({ type: 'CONNECT', payload: { clientId } });
+      }
+    }
+  }, [state]);
+  
   const contextValue: WebSocketContextValue = {
     ...state,
     connect,
     disconnect,
-    sendMessage
+    sendMessage,
+    subscribe,
+    unsubscribe,
+    ping,
+    getAnalyticsForInstrument,
+    getTechnicalIndicatorsForInstrument,
+    getPricePredictionForInstrument,
+    getRiskMetricsForInstrument
   };
 
   return (

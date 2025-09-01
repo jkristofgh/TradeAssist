@@ -90,14 +90,14 @@ const HistoricalDataPage: React.FC<HistoricalDataPageProps> = ({ defaultTab = 'n
       
       const request = {
         symbols: query.symbols,
-        start_date: query.startDate?.toISOString(),
-        end_date: query.endDate?.toISOString(),
+        startDate: query.startDate?.toISOString(),
+        endDate: query.endDate?.toISOString(),
         frequency: query.frequency,
-        include_extended_hours: query.includeExtendedHours,
-        max_records: query.maxRecords,
-        asset_class: query.assetClass,
-        continuous_series: query.continuousSeries,
-        roll_policy: query.rollPolicy
+        includeExtendedHours: query.includeExtendedHours,
+        maxRecords: query.maxRecords,
+        assetClass: query.assetClass,
+        continuousSeries: query.continuousSeries,
+        rollPolicy: query.rollPolicy
       };
       
       const response = await historicalDataService.fetchData(request);
@@ -237,10 +237,10 @@ const HistoricalDataPage: React.FC<HistoricalDataPageProps> = ({ defaultTab = 'n
       
       if (format === 'csv') {
         blob = await historicalDataService.exportToCSV(data);
-        filename = `historical_data_${Date.now()}.csv`;
+        filename = `historicalData_${Date.now()}.csv`;
       } else {
         blob = await historicalDataService.exportToJSON(data);
-        filename = `historical_data_${Date.now()}.json`;
+        filename = `historicalData_${Date.now()}.json`;
       }
       
       const url = URL.createObjectURL(blob);

@@ -1,0 +1,334 @@
+/**
+ * Market Analysis Section Styles
+ */
+
+.market-analysis-section {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.market-analysis-section__header {
+  padding: 1.5rem 1.5rem 0 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 1.5rem;
+}
+
+.market-analysis-section__title {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.market-analysis-section__timestamp {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 400;
+}
+
+.market-analysis-section__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 1rem;
+  color: #64748b;
+}
+
+.market-analysis-section__content {
+  padding: 0 1.5rem 1.5rem 1.5rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Trend Indicator Styles */
+.market-analysis-section__trend {
+  margin-bottom: 1.5rem;
+}
+
+.trend-indicator {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.trend-indicator__icon {
+  font-size: 1.5rem;
+}
+
+.trend-indicator__info {
+  flex: 1;
+}
+
+.trend-indicator__label {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.trend-indicator__label.trend-bullish {
+  color: #059669;
+}
+
+.trend-indicator__label.trend-bearish {
+  color: #dc2626;
+}
+
+.trend-indicator__label.trend-neutral {
+  color: #d97706;
+}
+
+.trend-indicator__label.trend-unknown {
+  color: #64748b;
+}
+
+.trend-indicator__strength {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+/* Section Subtitle */
+.section-subtitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 0.75rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+/* Technical Indicators */
+.market-analysis-section__indicators {
+  margin-bottom: 1.5rem;
+}
+
+.indicators-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.indicator-item {
+  padding: 0.75rem;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.indicator-item__name {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+}
+
+.indicator-item__value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.25rem;
+}
+
+.indicator-item__signal {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+}
+
+.indicator-item__signal.signal-bullish {
+  color: #059669;
+  background: #ecfdf5;
+}
+
+.indicator-item__signal.signal-bearish {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+.indicator-item__signal.signal-neutral {
+  color: #d97706;
+  background: #fffbeb;
+}
+
+/* Support and Resistance Levels */
+.market-analysis-section__levels {
+  margin-bottom: 1.5rem;
+}
+
+.levels-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.level-group__title {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.level-group__values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.level-value {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.level-value--support {
+  color: #059669;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.level-value--resistance {
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+}
+
+/* Detected Patterns */
+.market-analysis-section__patterns {
+  margin-bottom: 1.5rem;
+}
+
+.patterns-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pattern-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.pattern-item__name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.pattern-item__confidence {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #059669;
+  background: #ecfdf5;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+}
+
+.pattern-item__timeframe {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+/* Analysis Summary */
+.market-analysis-section__summary {
+  margin-bottom: 1.5rem;
+}
+
+.summary-text {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #374151;
+  margin: 0;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+/* Trading Signals */
+.market-analysis-section__signals {
+  margin-bottom: 1rem;
+}
+
+.signals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.signal-item {
+  padding: 0.75rem;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.signal-item__type {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.25rem;
+}
+
+.signal-item__strength {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+}
+
+.signal-item__description {
+  font-size: 0.75rem;
+  color: #374151;
+  line-height: 1.4;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .indicators-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+  
+  .levels-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .trend-indicator {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.5rem;
+  }
+  
+  .pattern-item {
+    flex-direction: column;
+    align-items: start;
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .market-analysis-section__header,
+  .market-analysis-section__content {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  .indicators-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

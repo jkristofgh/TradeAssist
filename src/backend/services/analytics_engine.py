@@ -79,6 +79,23 @@ class AnalyticsEngine:
             TechnicalIndicator.ADX: 14
         }
         
+        # Initialize strategy pattern components - NEW
+        from .analytics.indicator_calculator import IndicatorCalculator
+        from .analytics.strategies import (
+            RSIStrategy, MACDStrategy, BollingerStrategy,
+            MovingAverageStrategy, StochasticStrategy, ATRStrategy
+        )
+        
+        self.indicator_calculator = IndicatorCalculator()
+        
+        # Register all strategies
+        self.indicator_calculator.register_strategy(TechnicalIndicator.RSI, RSIStrategy())
+        self.indicator_calculator.register_strategy(TechnicalIndicator.MACD, MACDStrategy())
+        self.indicator_calculator.register_strategy(TechnicalIndicator.BOLLINGER_BANDS, BollingerStrategy())
+        self.indicator_calculator.register_strategy(TechnicalIndicator.MOVING_AVERAGE, MovingAverageStrategy())
+        self.indicator_calculator.register_strategy(TechnicalIndicator.STOCHASTIC, StochasticStrategy())
+        self.indicator_calculator.register_strategy(TechnicalIndicator.ATR, ATRStrategy())
+        
     async def get_market_analysis(
         self,
         instrument_id: int,
@@ -266,7 +283,16 @@ class AnalyticsEngine:
         instrument_id: int
     ) -> Optional[IndicatorResult]:
         """
-        Calculate a specific technical indicator.
+        Calculate a specific technical indicator using strategy pattern.
+        
+        REPLACEMENT for 98-line god method.
+        
+        Requirements:
+        - Delegate to strategy pattern via indicator_calculator
+        - Maintain identical method signature 
+        - Preserve existing error handling patterns
+        - Maintain existing performance characteristics
+        - Log strategy selection and execution time
         
         Args:
             indicator_type: Type of indicator to calculate.
@@ -277,87 +303,52 @@ class AnalyticsEngine:
             IndicatorResult: Calculated indicator or None.
         """
         try:
-            timestamp = datetime.utcnow()
-            values = {}
-            metadata = {}
+            # Get strategy for indicator type
+            strategy = self.indicator_calculator.strategies.get(indicator_type)
+            if not strategy:
+                logger.warning(f"No strategy found for {indicator_type.value}")
+                return None
             
-            if indicator_type == TechnicalIndicator.RSI:
-                period = self.indicator_periods[indicator_type]
-                rsi = self._calculate_rsi(market_data['close'], period)
-                values = {
-                    'rsi': rsi.iloc[-1] if not rsi.empty else 50.0,
-                    'overbought': 70.0,
-                    'oversold': 30.0
-                }
-                metadata = {'period': period}
+            # Get default parameters for indicator type based on existing configuration
+            default_params = self._get_indicator_parameters(indicator_type)
             
-            elif indicator_type == TechnicalIndicator.MACD:
-                fast, slow, signal = self.indicator_periods[indicator_type]
-                macd_line, signal_line, histogram = self._calculate_macd(
-                    market_data['close'], fast, slow, signal
-                )
-                values = {
-                    'macd': macd_line.iloc[-1] if not macd_line.empty else 0.0,
-                    'signal': signal_line.iloc[-1] if not signal_line.empty else 0.0,
-                    'histogram': histogram.iloc[-1] if not histogram.empty else 0.0
-                }
-                metadata = {'fast': fast, 'slow': slow, 'signal': signal}
-            
-            elif indicator_type == TechnicalIndicator.BOLLINGER_BANDS:
-                period, std_dev = self.indicator_periods[indicator_type]
-                upper, middle, lower = self._calculate_bollinger_bands(
-                    market_data['close'], period, std_dev
-                )
-                current_price = market_data['close'].iloc[-1]
-                values = {
-                    'upper_band': upper.iloc[-1] if not upper.empty else current_price,
-                    'middle_band': middle.iloc[-1] if not middle.empty else current_price,
-                    'lower_band': lower.iloc[-1] if not lower.empty else current_price,
-                    'bandwidth': ((upper.iloc[-1] - lower.iloc[-1]) / middle.iloc[-1]) * 100 if not middle.empty else 0.0
-                }
-                metadata = {'period': period, 'std_dev': std_dev}
-            
-            elif indicator_type == TechnicalIndicator.MOVING_AVERAGE:
-                periods = self.indicator_periods[indicator_type]
-                for period in periods:
-                    ma = self._calculate_sma(market_data['close'], period)
-                    values[f'ma_{period}'] = ma.iloc[-1] if not ma.empty else market_data['close'].iloc[-1]
-                metadata = {'periods': periods}
-            
-            elif indicator_type == TechnicalIndicator.STOCHASTIC:
-                k_period, d_period = self.indicator_periods[indicator_type]
-                k_percent, d_percent = self._calculate_stochastic(
-                    market_data['high'], market_data['low'], market_data['close'],
-                    k_period, d_period
-                )
-                values = {
-                    'k_percent': k_percent.iloc[-1] if not k_percent.empty else 50.0,
-                    'd_percent': d_percent.iloc[-1] if not d_percent.empty else 50.0
-                }
-                metadata = {'k_period': k_period, 'd_period': d_period}
-            
-            elif indicator_type == TechnicalIndicator.ATR:
-                period = self.indicator_periods[indicator_type]
-                atr = self._calculate_atr(
-                    market_data['high'], market_data['low'], market_data['close'], period
-                )
-                values = {
-                    'atr': atr.iloc[-1] if not atr.empty else 0.0,
-                    'atr_percent': (atr.iloc[-1] / market_data['close'].iloc[-1]) * 100 if not atr.empty else 0.0
-                }
-                metadata = {'period': period}
-            
-            return IndicatorResult(
-                indicator_type=indicator_type,
-                timestamp=timestamp,
-                instrument_id=instrument_id,
-                values=values,
-                metadata=metadata
+            # Delegate to strategy pattern
+            result = await self.indicator_calculator.calculate_indicator(
+                indicator_type, market_data, instrument_id, **default_params
             )
+            
+            return result
             
         except Exception as e:
             logger.error(f"Error calculating {indicator_type.value}: {e}")
             return None
+    
+    def _get_indicator_parameters(self, indicator_type: TechnicalIndicator) -> Dict[str, Any]:
+        """
+        Convert legacy indicator_periods to strategy parameters.
+        
+        This maintains backward compatibility with existing period configurations.
+        """
+        periods = self.indicator_periods.get(indicator_type)
+        
+        if indicator_type == TechnicalIndicator.RSI:
+            return {'period': periods}
+        elif indicator_type == TechnicalIndicator.MACD:
+            fast, slow, signal = periods
+            return {'fast_period': fast, 'slow_period': slow, 'signal_period': signal}
+        elif indicator_type == TechnicalIndicator.BOLLINGER_BANDS:
+            period, std_dev = periods
+            return {'period': period, 'std_dev': std_dev}
+        elif indicator_type == TechnicalIndicator.MOVING_AVERAGE:
+            return {'periods': periods} if isinstance(periods, list) else {'period': periods}
+        elif indicator_type == TechnicalIndicator.STOCHASTIC:
+            k_period, d_period = periods
+            return {'k_period': k_period, 'd_period': d_period}
+        elif indicator_type == TechnicalIndicator.ATR:
+            return {'period': periods}
+        else:
+            # Fallback for unhandled indicators
+            return {}
     
     def _calculate_rsi(self, prices: pd.Series, period: int = 14) -> pd.Series:
         """Calculate Relative Strength Index."""

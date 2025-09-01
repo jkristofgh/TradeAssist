@@ -1,0 +1,57 @@
+/**
+ * Loading Spinner Styles
+ */
+
+.loading-spinner {
+  display: inline-block;
+}
+
+.loading-spinner__circle {
+  border-radius: 50%;
+  animation: loading-spin 1s linear infinite;
+}
+
+/* Size variants */
+.loading-spinner--small .loading-spinner__circle {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+.loading-spinner--medium .loading-spinner__circle {
+  width: 24px;
+  height: 24px;
+  border-width: 2px;
+}
+
+.loading-spinner--large .loading-spinner__circle {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
+/* Color variants */
+.loading-spinner--primary .loading-spinner__circle {
+  border: 2px solid #e2e8f0;
+  border-top-color: #3b82f6;
+}
+
+.loading-spinner--secondary .loading-spinner__circle {
+  border: 2px solid #e2e8f0;
+  border-top-color: #64748b;
+}
+
+.loading-spinner--white .loading-spinner__circle {
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+}
+
+/* Animation */
+@keyframes loading-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

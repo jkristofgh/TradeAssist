@@ -452,38 +452,38 @@ class RiskCalculator:
         instrument_id: int,
         lookback_days: int
     ) -> pd.Series:
-    """Get returns data for an instrument."""
-    try:
-        # Try to get data from market data processor first
-        ohlcv_data = await market_data_processor.get_ohlcv_data(
+        """Get returns data for an instrument."""
+        try:
+            # Try to get data from market data processor first
+            ohlcv_data = await market_data_processor.get_ohlcv_data(
             instrument_id=instrument_id,
             frequency=DataFrequency.DAILY,
             start_time=datetime.utcnow() - timedelta(days=lookback_days),
             limit=lookback_days
-        )
-        
-        if ohlcv_data:
-            prices = pd.Series(
+            )
+            
+            if ohlcv_data:
+                prices = pd.Series(
                 [bar.close for bar in ohlcv_data],
                 index=[bar.timestamp for bar in ohlcv_data]
-            )
-            returns = prices.pct_change().dropna()
-            return returns
-        
-        # Fall back to database query
-        return await self._get_returns_from_db(instrument_id, lookback_days)
-        
-    except Exception as e:
-        logger.error(f"Error getting returns data: {e}")
-        return pd.Series(dtype=float)
+                )
+                returns = prices.pct_change().dropna()
+                return returns
+            
+            # Fall back to database query
+            return await self._get_returns_from_db(instrument_id, lookback_days)
+            
+        except Exception as e:
+            logger.error(f"Error getting returns data: {e}")
+            return pd.Series(dtype=float)
 
     @with_db_session
     @handle_db_errors("Returns data retrieval")
     async def _get_returns_from_db(self, session, instrument_id: int, lookback_days: int) -> pd.Series:
-    """Get returns data from database."""
-    cutoff_time = datetime.utcnow() - timedelta(days=lookback_days)
-    
-    result = await session.execute(
+        """Get returns data from database."""
+        cutoff_time = datetime.utcnow() - timedelta(days=lookback_days)
+        
+        result = await session.execute(
         select(MarketData)
         .where(
             and_(
@@ -492,39 +492,39 @@ class RiskCalculator:
             )
         )
         .order_by(MarketData.timestamp)
-    )
-    
-    records = result.scalars().all()
-    
-    if not records:
-        return pd.Series(dtype=float)
-    
-    # Convert to price series
-    prices = pd.Series(
-        [float(record.price) for record in records if record.price],
-        index=[record.timestamp for record in records if record.price]
-    )
-    
-    if len(prices) < 2:
-        return pd.Series(dtype=float)
-    
-    # Calculate returns
-    returns = prices.pct_change().dropna()
-    return returns
+        )
+        
+        records = result.scalars().all()
+        
+        if not records:
+            return pd.Series(dtype=float)
+        
+        # Convert to price series
+        prices = pd.Series(
+            [float(record.price) for record in records if record.price],
+            index=[record.timestamp for record in records if record.price]
+        )
+        
+        if len(prices) < 2:
+            return pd.Series(dtype=float)
+        
+        # Calculate returns
+        returns = prices.pct_change().dropna()
+        return returns
     
     @with_db_session
     @handle_db_errors("Current price retrieval")
     async def _get_current_price(self, session, instrument_id: int) -> Optional[float]:
-    """Get current price for an instrument."""
-    result = await session.execute(
+        """Get current price for an instrument."""
+        result = await session.execute(
         select(MarketData)
         .where(MarketData.instrument_id == instrument_id)
         .order_by(MarketData.timestamp.desc())
         .limit(1)
-    )
-    
-    record = result.scalar_one_or_none()
-    return float(record.price) if record and record.price else None
+        )
+        
+        record = result.scalar_one_or_none()
+        return float(record.price) if record and record.price else None
     
     async def _calculate_historical_var(
         self,

@@ -1,0 +1,270 @@
+/**
+ * Price Prediction Section Styles
+ */
+
+.price-prediction-section {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.price-prediction-section__header {
+  padding: 1.5rem 1.5rem 0 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 1.5rem;
+}
+
+.price-prediction-section__title {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.price-prediction-section__timestamp {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 400;
+}
+
+.price-prediction-section__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 1rem;
+  color: #64748b;
+}
+
+.price-prediction-section__content {
+  padding: 0 1.5rem 1.5rem 1.5rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Section Subtitle */
+.section-subtitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 0.75rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+/* Main Prediction */
+.prediction-main {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.prediction-main__label {
+  font-size: 0.875rem;
+  opacity: 0.9;
+  margin-bottom: 0.5rem;
+}
+
+.prediction-main__value {
+  font-size: 2rem;
+  font-weight: 700;
+  font-family: 'Monaco', 'Menlo', monospace;
+  margin-bottom: 0.5rem;
+}
+
+.prediction-main__confidence {
+  font-size: 0.875rem;
+  opacity: 0.8;
+  margin-bottom: 1rem;
+}
+
+.prediction-range {
+  display: flex;
+  justify-content: space-around;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.prediction-range__item {
+  text-align: center;
+  flex: 1;
+}
+
+.prediction-range__label {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin-bottom: 0.25rem;
+}
+
+.prediction-range__value {
+  font-size: 1.125rem;
+  font-weight: 600;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.prediction-range__value--low {
+  color: #fca5a5;
+}
+
+.prediction-range__value--high {
+  color: #a7f3d0;
+}
+
+/* Model Information */
+.model-info {
+  margin-bottom: 1.5rem;
+}
+
+.model-info__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.model-info__item {
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.model-info__label {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.model-info__value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* Contributing Factors */
+.prediction-factors {
+  margin-bottom: 1.5rem;
+}
+
+.factors-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.factor-item {
+  padding: 1rem;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.factor-item__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.factor-item__name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.factor-item__impact {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.factor-item__impact--positive {
+  color: #059669;
+  background: #ecfdf5;
+}
+
+.factor-item__impact--negative {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+.factor-item__impact--neutral {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.factor-item__description {
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+/* Disclaimer */
+.prediction-disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: #fffbeb;
+  border: 1px solid #fde047;
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+.prediction-disclaimer__icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.prediction-disclaimer__text {
+  font-size: 0.75rem;
+  color: #92400e;
+  line-height: 1.5;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .prediction-main__value {
+    font-size: 1.5rem;
+  }
+  
+  .prediction-range {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .model-info__grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .factor-item__header {
+    flex-direction: column;
+    align-items: start;
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .price-prediction-section__header,
+  .price-prediction-section__content {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  .prediction-main {
+    padding: 1rem;
+  }
+  
+  .prediction-main__value {
+    font-size: 1.25rem;
+  }
+}
