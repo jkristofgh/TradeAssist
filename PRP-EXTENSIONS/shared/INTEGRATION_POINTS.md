@@ -1,12 +1,15 @@
 # TradeAssist Integration Points
 
-**Generated:** 2025-08-30  
-**Target:** src/ directory  
-**Analysis Type:** Specific extension and integration opportunities  
+**Generated:** 2025-08-31  
+**Updated:** 2025-08-31  
+**Target:** src/ directory (Phase 4 Complete)  
+**Analysis Type:** Specific extension and integration opportunities for PRP Extension Framework  
 
 ## Overview
 
-This document identifies specific points in the TradeAssist codebase where extensions can integrate safely and effectively. Each integration point includes implementation patterns, examples, and compatibility guidelines to ensure seamless extension development.
+This document identifies specific integration points within the TradeAssist codebase where extensions can safely integrate while maintaining system integrity, performance, and architectural consistency. Each integration point includes detailed implementation patterns, working examples from the existing codebase, and compatibility guidelines based on the current system architecture.
+
+The TradeAssist system provides a robust foundation for extension through well-defined architectural patterns, dependency injection mechanisms, and standardized interfaces across both backend services and frontend components.
 
 ## API Extension Points
 
@@ -41,11 +44,13 @@ def create_app() -> FastAPI:
 ```
 
 **Existing Router Patterns:**
-- `src/backend/api/health.py` - Simple monitoring endpoints
-- `src/backend/api/instruments.py` - CRUD operations with validation
-- `src/backend/api/rules.py` - Complex business logic with caching
-- `src/backend/api/analytics.py` - ML/AI endpoint patterns
-- `src/backend/api/auth.py` - Authentication flow patterns
+- `src/backend/api/health.py` - System monitoring with detailed statistics (12 endpoints)
+- `src/backend/api/instruments.py` - CRUD operations with validation (4 endpoints)
+- `src/backend/api/rules.py` - Alert rule management with complex logic (5 endpoints)
+- `src/backend/api/analytics.py` - Advanced analytics with ML models (11 endpoints)
+- `src/backend/api/auth.py` - Schwab API authentication flow (3 endpoints)
+- `src/backend/api/alerts.py` - Alert management and history (3 endpoints)
+- `src/backend/api/historical_data.py` - Historical data operations (6 endpoints)
 
 **Response Format Standards:**
 ```python
@@ -196,7 +201,7 @@ def upgrade():
 
 **Using Existing Session Management:**
 ```python
-# Use established session pattern
+# Use established session pattern from src/backend/database/connection.py
 from src.backend.database.connection import get_db_session
 
 async def your_database_operation():
@@ -704,24 +709,356 @@ class YourRequestModel(BaseModel):
         str_strip_whitespace = True
 ```
 
+## Strategy Pattern Extension Points
+
+### 1. Technical Indicator Strategies
+
+**Strategy Implementation Pattern:**
+```python
+# src/backend/services/analytics/strategies/your_strategy.py
+from .base import IndicatorStrategy
+from typing import Dict, Any, Optional
+import pandas as pd
+from datetime import datetime
+
+class YourStrategy(IndicatorStrategy):
+    """
+    Custom technical indicator strategy following established patterns.
+    
+    Implements the Strategy pattern used throughout the analytics engine.
+    """
+    
+    async def calculate(self, market_data: pd.DataFrame, instrument_id: int, **params) -> Optional[IndicatorResult]:
+        """
+        Calculate your custom indicator.
+        
+        Args:
+            market_data: OHLCV DataFrame with required columns
+            instrument_id: ID of the instrument being analyzed
+            **params: Strategy-specific parameters
+            
+        Returns:
+            IndicatorResult with calculated values and metadata
+        """
+        try:
+            # Validate required columns
+            required_columns = ['open', 'high', 'low', 'close', 'volume']
+            if not all(col in market_data.columns for col in required_columns):
+                raise ValueError(f"Missing required columns: {required_columns}")
+            
+            # Your indicator calculation logic
+            result_values = self._calculate_your_indicator(market_data, **params)
+            
+            return IndicatorResult(
+                indicator_type=TechnicalIndicator.YOUR_INDICATOR,
+                values=result_values,
+                metadata={
+                    'instrument_id': instrument_id,
+                    'calculation_time': datetime.utcnow(),
+                    'parameters': params,
+                    'data_points': len(market_data)
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error calculating your indicator: {e}")
+            return None
+    
+    def get_default_parameters(self) -> Dict[str, Any]:
+        """Return default parameters for your strategy."""
+        return {
+            'period': 14,
+            'your_param': 2.0
+        }
+    
+    def validate_parameters(self, params: Dict[str, Any]) -> bool:
+        """Validate strategy parameters."""
+        required = ['period']
+        return all(param in params for param in required)
+```
+
+**Strategy Registration:**
+```python
+# Register in src/backend/services/analytics/indicator_calculator.py
+from .strategies.your_strategy import YourStrategy
+
+class IndicatorCalculator:
+    def __init__(self):
+        # ... existing initialization ...
+        
+        # Register your strategy
+        self.register_strategy(TechnicalIndicator.YOUR_INDICATOR, YourStrategy())
+```
+
+**Existing Strategy Examples:**
+- `RSIStrategy` - Relative Strength Index with configurable periods
+- `MACDStrategy` - Moving Average Convergence Divergence with signal lines
+- `BollingerStrategy` - Bollinger Bands with standard deviation bands
+- `MovingAverageStrategy` - Simple/Exponential moving averages
+- `StochasticStrategy` - Stochastic oscillator with %K and %D lines
+- `ATRStrategy` - Average True Range for volatility measurement
+
+## Analytics and Monitoring Extension Points
+
+### 1. Analytics Engine Integration
+
+**Custom Analytics Service:**
+```python
+# src/backend/services/your_analytics.py
+from src.backend.services.analytics_engine import AnalyticsEngine
+from src.backend.models.market_data import MarketData
+
+class YourAnalyticsService:
+    def __init__(self):
+        self.analytics_engine = AnalyticsEngine()
+    
+    async def calculate_your_metric(self, market_data: List[MarketData]) -> Dict[str, float]:
+        """Calculate custom analytics following established patterns."""
+        # Use existing analytics engine patterns
+        return await self.analytics_engine.calculate_indicators(
+            market_data, 
+            indicators=["your_custom_indicator"]
+        )
+```
+
+### 2. Machine Learning Integration
+
+**ML Model Extension:**
+```python
+# src/backend/services/your_ml_service.py
+from src.backend.services.ml_models import MLModels
+import numpy as np
+from typing import List, Dict, Any
+
+class YourMLService:
+    def __init__(self):
+        self.ml_models = MLModels()
+    
+    async def train_your_model(self, features: np.ndarray, targets: np.ndarray) -> Dict[str, Any]:
+        """Train custom ML model following established patterns."""
+        # Follow existing ML model patterns from ml_models.py
+        model_metrics = await self.ml_models.train_model(
+            model_type="your_model",
+            features=features,
+            targets=targets
+        )
+        return model_metrics
+```
+
+## Historical Data Extension Points
+
+### 1. Historical Data Service Integration
+
+**Custom Data Analysis:**
+```python
+# src/backend/services/your_data_analyzer.py
+from src.backend.services.historical_data_service import HistoricalDataService
+from src.backend.models.historical_data import HistoricalDataRequest
+
+class YourDataAnalyzer:
+    def __init__(self):
+        self.historical_service = HistoricalDataService()
+    
+    async def analyze_historical_pattern(self, symbol: str, days: int = 30) -> Dict[str, Any]:
+        """Analyze historical patterns using existing service."""
+        request = HistoricalDataRequest(
+            symbols=[symbol],
+            period_days=days,
+            period_type="daily"
+        )
+        
+        data = await self.historical_service.get_historical_data(request)
+        # Your custom analysis logic
+        return {"pattern": "custom_analysis_result"}
+```
+
+### 2. Real-time Data Integration
+
+**Market Data Processor Extension:**
+```python
+# src/backend/services/your_market_processor.py
+from src.backend.services.market_data_processor import MarketDataProcessor
+from src.backend.models.market_data import MarketData
+
+class YourMarketProcessor:
+    def __init__(self):
+        self.market_processor = MarketDataProcessor()
+    
+    async def process_your_data(self, market_data: MarketData) -> Dict[str, Any]:
+        """Process market data with custom logic."""
+        # Use existing processor patterns
+        normalized_data = await self.market_processor.normalize_data(market_data)
+        
+        # Your custom processing
+        result = {
+            "processed_at": datetime.utcnow(),
+            "data": normalized_data,
+            "your_metric": self._calculate_your_metric(normalized_data)
+        }
+        
+        return result
+```
+
+## Notification System Extension Points
+
+### 1. Notification Channel Extension
+
+**Custom Notification Channel:**
+```python
+# src/backend/services/your_notification.py
+from src.backend.services.notification import NotificationService
+from typing import Dict, Any
+
+class YourNotificationChannel:
+    def __init__(self):
+        self.notification_service = NotificationService()
+    
+    async def send_your_notification(self, message: str, data: Dict[str, Any]) -> bool:
+        """Send notification through your custom channel."""
+        try:
+            # Your custom notification logic (email, SMS, etc.)
+            success = await self._send_notification(message, data)
+            
+            # Log using existing patterns
+            if success:
+                logger.info(f"Your notification sent successfully: {message}")
+            else:
+                logger.error(f"Failed to send your notification: {message}")
+            
+            return success
+        except Exception as e:
+            logger.error(f"Error sending your notification: {e}")
+            return False
+```
+
+### 2. Alert Rule Extension
+
+**Custom Alert Types:**
+```python
+# src/backend/models/your_alert_rules.py
+from src.backend.models.alert_rules import AlertRule, RuleType, RuleCondition
+from sqlalchemy import Enum as SQLEnum
+from enum import Enum
+
+class YourRuleType(Enum):
+    YOUR_CUSTOM_RULE = "your_custom_rule"
+    YOUR_PATTERN_RULE = "your_pattern_rule"
+
+class YourAlertRule(AlertRule):
+    """Extended alert rule with custom types."""
+    
+    # Extend rule types
+    rule_type: Mapped[YourRuleType] = mapped_column(
+        SQLEnum(YourRuleType), 
+        nullable=False
+    )
+    
+    # Add custom configuration
+    custom_config: Mapped[Dict] = mapped_column(JSON, nullable=True)
+```
+
+## WebSocket Real-time Extension Points
+
+### 1. Custom WebSocket Handlers
+
+**Real-time Data Broadcasting:**
+```python
+# src/backend/websocket/your_realtime.py
+from src.backend.websocket.realtime import ConnectionManager, get_websocket_manager
+from fastapi import WebSocket
+
+class YourRealtimeHandler:
+    def __init__(self):
+        self.manager = get_websocket_manager()
+    
+    async def handle_your_subscription(self, websocket: WebSocket, subscription_data: Dict):
+        """Handle custom subscription following established patterns."""
+        try:
+            # Process subscription
+            subscription_id = subscription_data.get("id")
+            
+            # Store subscription (follow existing patterns)
+            await self.manager.add_subscription(websocket, subscription_id, subscription_data)
+            
+            # Send confirmation
+            await websocket.send_json({
+                "message_type": "subscription_confirmed",
+                "subscription_id": subscription_id
+            })
+            
+        except Exception as e:
+            await websocket.send_json({
+                "message_type": "error",
+                "error": f"Subscription failed: {str(e)}"
+            })
+```
+
+### 2. Frontend Real-time Integration
+
+**Custom WebSocket Hook:**
+```typescript
+// src/frontend/src/hooks/useYourRealtime.ts
+import { useEffect, useState } from 'react';
+import { useWebSocketContext } from '../context/WebSocketContext';
+
+interface YourRealtimeData {
+  // Define your real-time data structure
+}
+
+export const useYourRealtime = () => {
+  const { socket, isConnected, sendMessage } = useWebSocketContext();
+  const [yourData, setYourData] = useState<YourRealtimeData[]>([]);
+
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const handleYourMessage = (event: MessageEvent) => {
+      const message = JSON.parse(event.data);
+      
+      if (message.message_type === 'your_data_update') {
+        setYourData(prevData => {
+          // Update your real-time data
+          return [...prevData, message.data];
+        });
+      }
+    };
+
+    socket.addEventListener('message', handleYourMessage);
+
+    // Subscribe to your data stream
+    sendMessage({
+      message_type: 'subscribe_your_data',
+      subscription_data: { /* your subscription parameters */ }
+    });
+
+    return () => {
+      socket.removeEventListener('message', handleYourMessage);
+      
+      // Unsubscribe on cleanup
+      sendMessage({
+        message_type: 'unsubscribe_your_data'
+      });
+    };
+  }, [socket, isConnected, sendMessage]);
+
+  return { yourData };
+};
+```
+
 ## Compatibility Guidelines
 
 ### 1. Backward Compatibility
-
 - **API Versioning**: Use `/api/v1/` prefix for new endpoints
 - **Database Changes**: Always use migrations, never direct schema changes
 - **Configuration**: Add new settings with sensible defaults
 - **Dependencies**: Check compatibility with existing package versions
 
 ### 2. Performance Considerations
-
 - **Database Queries**: Follow established async patterns
 - **Caching**: Use existing caching strategies where possible
 - **Logging**: Use structlog for consistent logging format
 - **Error Handling**: Follow established error response formats
 
 ### 3. Code Quality Standards
-
 - **Python**: Follow PEP 8, use type hints, include docstrings
 - **TypeScript**: Use strict mode, follow existing component patterns
 - **Testing**: Maintain test coverage, follow existing test patterns
