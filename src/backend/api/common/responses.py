@@ -7,6 +7,7 @@ with specialized builders for different domain contexts.
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
+import time
 from pydantic import BaseModel
 
 from .exceptions import StandardAPIError
@@ -592,3 +593,341 @@ class HealthResponseBuilder(APIResponseBuilder):
             return "acceptable"
         else:
             return "critical"
+
+
+# =============================================================================
+# PERFORMANCE OPTIMIZED RESPONSE BUILDERS - PHASE 3
+# Enhanced for <10ms standardization overhead requirement
+# =============================================================================
+
+class OptimizedAPIResponseBuilder(APIResponseBuilder):
+    """
+    Performance-optimized base response builder.
+    
+    Implements caching and pre-computation strategies to minimize
+    response building overhead and meet <10ms standardization target.
+    """
+    
+    def __init__(self):
+        """Initialize optimized response builder with caching."""
+        super().__init__()
+        self._cached_base_metadata = {}
+        self._cached_error_responses = {}
+        self._iso_timestamp_cache = None
+        self._iso_timestamp_cache_time = None
+    
+    def _get_cached_timestamp(self) -> str:
+        """Get cached ISO timestamp to avoid repeated formatting."""
+        current_time = time.time()
+        # Cache timestamp for up to 1 second to reduce datetime.isoformat() calls
+        if (self._iso_timestamp_cache_time is None or 
+            current_time - self._iso_timestamp_cache_time > 1.0):
+            self._iso_timestamp_cache = self._timestamp.isoformat()
+            self._iso_timestamp_cache_time = current_time
+        return self._iso_timestamp_cache
+    
+    def success(self, data: Any, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Optimized successful response creation.
+        
+        Performance improvements:
+        - Pre-computed base structure
+        - Cached timestamp formatting
+        - Minimal dictionary operations
+        """
+        # Use pre-computed base structure when possible
+        if not metadata and not self._metadata:
+            return {
+                "success": True,
+                "data": data,
+                "timestamp": self._get_cached_timestamp()
+            }
+        
+        # Build metadata efficiently
+        combined_metadata = self._metadata.copy() if self._metadata else {}
+        if metadata:
+            combined_metadata.update(metadata)
+        
+        return {
+            "success": True,
+            "data": data,
+            "metadata": combined_metadata if combined_metadata else None,
+            "timestamp": self._get_cached_timestamp()
+        }
+    
+    def error(self, error: 'StandardAPIError') -> Dict[str, Any]:
+        """
+        Optimized error response creation with caching.
+        
+        Caches common error response structures to avoid repeated
+        model creation and serialization overhead.
+        """
+        # Create cache key based on error type and code
+        cache_key = f"{type(error).__name__}:{getattr(error, 'error_code', 'unknown')}"
+        
+        if cache_key in self._cached_error_responses:
+            # Use cached structure but update timestamp and details
+            cached_response = self._cached_error_responses[cache_key].copy()
+            cached_response["timestamp"] = self._get_cached_timestamp()
+            if hasattr(error, 'details') and error.details:
+                cached_response["error"]["details"] = error.details
+            return cached_response
+        
+        # Create new error response and cache the structure
+        error_response = {
+            "success": False,
+            "error": {
+                "error_code": getattr(error, 'error_code', 'UNKNOWN_ERROR'),
+                "error_category": getattr(error, 'error_category', 'system'),
+                "message": str(error),
+                "details": getattr(error, 'details', None),
+                "request_path": getattr(error, 'request_path', None),
+                "correlation_id": getattr(error, 'correlation_id', None)
+            },
+            "timestamp": self._get_cached_timestamp()
+        }
+        
+        # Cache the structure (without timestamp and details for reuse)
+        cache_structure = {
+            "success": False,
+            "error": {
+                "error_code": getattr(error, 'error_code', 'UNKNOWN_ERROR'),
+                "error_category": getattr(error, 'error_category', 'system'),
+                "message": str(error),
+                "details": None,  # Will be updated per request
+                "request_path": getattr(error, 'request_path', None),
+                "correlation_id": getattr(error, 'correlation_id', None)
+            },
+            "timestamp": None  # Will be updated per request
+        }
+        
+        # Only cache if we have space (limit to 100 cached error types)
+        if len(self._cached_error_responses) < 100:
+            self._cached_error_responses[cache_key] = cache_structure
+        
+        return error_response
+    
+    def paginated(
+        self, 
+        items: List[Any], 
+        pagination: 'PaginationInfo',
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Optimized paginated response creation.
+        
+        Performance improvements:
+        - Pre-computed pagination metadata structure
+        - Efficient dictionary construction
+        """
+        # Pre-compute pagination metadata
+        pagination_metadata = {
+            "pagination": {
+                "page": pagination.page,
+                "per_page": pagination.per_page,
+                "total": pagination.total,
+                "pages": pagination.pages,
+                "has_next": pagination.has_next,
+                "has_prev": pagination.has_prev
+            }
+        }
+        
+        # Combine metadata efficiently
+        if metadata:
+            pagination_metadata.update(metadata)
+        if self._metadata:
+            pagination_metadata.update(self._metadata)
+        
+        return {
+            "success": True,
+            "data": items,
+            "metadata": pagination_metadata,
+            "timestamp": self._get_cached_timestamp()
+        }
+
+
+class OptimizedAnalyticsResponseBuilder(OptimizedAPIResponseBuilder):
+    """
+    Performance-optimized analytics response builder.
+    
+    Specialized for analytics endpoints with pre-computed common
+    metadata structures and efficient numeric data handling.
+    """
+    
+    def __init__(self):
+        """Initialize with analytics-specific optimizations."""
+        super().__init__()
+        self._analytics_metadata_template = {
+            "processing_time_ms": 0.0,
+            "data_points": 0,
+            "confidence_score": None,
+            "model_type": None,
+            "model_version": None,
+            "cache_hit": False
+        }
+    
+    def with_performance_metrics(
+        self, 
+        calculation_time: float, 
+        data_points: int, 
+        cache_hit: bool = False
+    ) -> 'OptimizedAnalyticsResponseBuilder':
+        """
+        Add performance metrics with pre-computed template.
+        
+        Performance optimization: Uses template copying instead of
+        repeated dictionary construction.
+        """
+        perf_metadata = self._analytics_metadata_template.copy()
+        perf_metadata.update({
+            "processing_time_ms": round(calculation_time * 1000, 2),
+            "data_points": data_points,
+            "cache_hit": cache_hit
+        })
+        
+        self._metadata.update(perf_metadata)
+        return self
+    
+    def with_confidence_score(self, confidence: float) -> 'OptimizedAnalyticsResponseBuilder':
+        """Add confidence score with validation."""
+        if "confidence_score" not in self._metadata:
+            self._metadata.update(self._analytics_metadata_template)
+        self._metadata["confidence_score"] = round(confidence, 4)
+        return self
+    
+    def with_model_metadata(
+        self, 
+        model_type: str, 
+        version: str
+    ) -> 'OptimizedAnalyticsResponseBuilder':
+        """Add model metadata efficiently."""
+        if "model_type" not in self._metadata:
+            self._metadata.update(self._analytics_metadata_template)
+        self._metadata.update({
+            "model_type": model_type,
+            "model_version": version
+        })
+        return self
+
+
+class OptimizedInstrumentResponseBuilder(OptimizedAPIResponseBuilder):
+    """
+    Performance-optimized instrument response builder.
+    
+    Optimized for instrument data with cached market status
+    and efficient timestamp handling.
+    """
+    
+    def __init__(self):
+        """Initialize with instrument-specific caching."""
+        super().__init__()
+        self._market_status_cache = {}
+        self._market_status_cache_time = {}
+    
+    def with_market_status(self, status: str) -> 'OptimizedInstrumentResponseBuilder':
+        """
+        Add market status with caching.
+        
+        Caches market status for up to 30 seconds to avoid
+        repeated market status lookups.
+        """
+        current_time = time.time()
+        cache_key = f"market_status_{status}"
+        
+        # Use cached status if recent
+        if (cache_key in self._market_status_cache_time and
+            current_time - self._market_status_cache_time[cache_key] < 30):
+            self._metadata["market_status"] = self._market_status_cache[cache_key]
+        else:
+            # Update cache
+            self._market_status_cache[cache_key] = status
+            self._market_status_cache_time[cache_key] = current_time
+            self._metadata["market_status"] = status
+        
+        return self
+    
+    def with_last_trade_info(
+        self, 
+        timestamp: datetime, 
+        price: float
+    ) -> 'OptimizedInstrumentResponseBuilder':
+        """Add last trade info efficiently."""
+        self._metadata.update({
+            "last_trade": {
+                "timestamp": timestamp.isoformat(),
+                "price": round(price, 4)
+            }
+        })
+        return self
+
+
+class OptimizedHealthResponseBuilder(OptimizedAPIResponseBuilder):
+    """
+    Performance-optimized health response builder.
+    
+    Optimized for health check endpoints with minimal overhead
+    and efficient status aggregation.
+    """
+    
+    def __init__(self):
+        """Initialize with health-specific optimizations."""
+        super().__init__()
+        self._health_status_template = {
+            "uptime_seconds": 0,
+            "memory_usage_mb": 0.0,
+            "cpu_usage_percent": 0.0,
+            "active_connections": 0,
+            "database_status": "unknown"
+        }
+    
+    def with_operational_metadata(
+        self, 
+        uptime_seconds: int,
+        memory_usage_mb: float,
+        cpu_usage_percent: float,
+        active_connections: int
+    ) -> 'OptimizedHealthResponseBuilder':
+        """
+        Add operational metadata with template-based construction.
+        
+        Uses pre-allocated template for consistent performance.
+        """
+        operational_metadata = self._health_status_template.copy()
+        operational_metadata.update({
+            "uptime_seconds": uptime_seconds,
+            "memory_usage_mb": round(memory_usage_mb, 2),
+            "cpu_usage_percent": round(cpu_usage_percent, 2),
+            "active_connections": active_connections
+        })
+        
+        self._metadata.update(operational_metadata)
+        return self
+    
+    def with_database_status(self, status: str) -> 'OptimizedHealthResponseBuilder':
+        """Add database status efficiently."""
+        self._metadata["database_status"] = status
+        return self
+
+
+# Factory function for creating optimized response builders
+def create_optimized_response_builder(builder_type: str) -> OptimizedAPIResponseBuilder:
+    """
+    Factory function for creating performance-optimized response builders.
+    
+    Args:
+        builder_type: Type of builder ('analytics', 'instrument', 'health', 'base')
+        
+    Returns:
+        Optimized response builder instance
+        
+    Performance: Uses pre-instantiated builders where possible.
+    """
+    builders = {
+        'analytics': OptimizedAnalyticsResponseBuilder,
+        'instrument': OptimizedInstrumentResponseBuilder,
+        'health': OptimizedHealthResponseBuilder,
+        'base': OptimizedAPIResponseBuilder
+    }
+    
+    builder_class = builders.get(builder_type, OptimizedAPIResponseBuilder)
+    return builder_class()

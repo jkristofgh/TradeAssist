@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List
 import structlog
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 
@@ -685,4 +685,392 @@ async def get_partition_status() -> Dict[str, Any]:
                 "average_partition_size_mb": 0,
                 "oldest_partition_days": 0
             }
+        }
+
+
+@router.get("/config/validate", response_model=Dict[str, Any])
+async def validate_configuration(
+    config_section: Optional[str] = Query(
+        None, 
+        description="Specific configuration section to validate (api_limits, validation, indicators, cache, monitoring)"
+    )
+) -> Dict[str, Any]:
+    """
+    Validate current configuration settings and return validation status.
+    
+    This endpoint validates configuration consistency and provides detailed
+    information about any configuration issues or warnings.
+    """
+    from ..api.common.configuration import config_manager
+    
+    try:
+        validation_results = {
+            "success": True,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "validation_summary": {
+                "total_sections": 5,
+                "valid_sections": 0,
+                "invalid_sections": 0,
+                "warnings": 0
+            },
+            "section_details": {}
+        }
+        
+        # Configuration sections to validate
+        sections = {
+            "api_limits": config_manager.api_limits,
+            "validation": config_manager.validation,
+            "indicators": config_manager.indicators,
+            "cache": config_manager.cache,
+            "monitoring": config_manager.monitoring
+        }
+        
+        # Validate specific section if requested
+        if config_section:
+            if config_section not in sections:
+                return {
+                    "success": False,
+                    "error": f"Invalid configuration section: {config_section}",
+                    "valid_sections": list(sections.keys())
+                }
+            sections = {config_section: sections[config_section]}
+        
+        # Validate each section
+        for section_name, config_obj in sections.items():
+            section_result = {
+                "valid": True,
+                "errors": [],
+                "warnings": [],
+                "settings_count": len(config_obj.dict())
+            }
+            
+            try:
+                # Attempt to recreate config object to validate current environment variables
+                config_class = type(config_obj)
+                test_config = config_class()
+                
+                # Check for any validation issues by comparing values
+                current_dict = config_obj.dict()
+                test_dict = test_config.dict()
+                
+                if current_dict != test_dict:
+                    section_result["warnings"].append(
+                        "Configuration may have changed since startup - consider reloading"
+                    )
+                    validation_results["validation_summary"]["warnings"] += 1
+                
+            except Exception as e:
+                section_result["valid"] = False
+                section_result["errors"].append(f"Validation error: {str(e)}")
+                validation_results["success"] = False
+                validation_results["validation_summary"]["invalid_sections"] += 1
+                continue
+            
+            if section_result["valid"]:
+                validation_results["validation_summary"]["valid_sections"] += 1
+            
+            validation_results["section_details"][section_name] = section_result
+        
+        # Validate cross-section consistency
+        consistency_errors = []
+        
+        try:
+            # Check pagination consistency
+            if (config_manager.api_limits.max_page_size != 
+                config_manager.validation.max_per_page):
+                consistency_errors.append(
+                    f"Pagination limit mismatch: api_limits.max_page_size "
+                    f"({config_manager.api_limits.max_page_size}) != "
+                    f"validation.max_per_page ({config_manager.validation.max_per_page})"
+                )
+        except Exception as e:
+            consistency_errors.append(f"Cross-validation error: {str(e)}")
+        
+        if consistency_errors:
+            validation_results["cross_section_validation"] = {
+                "valid": False,
+                "errors": consistency_errors
+            }
+            validation_results["success"] = False
+        else:
+            validation_results["cross_section_validation"] = {
+                "valid": True,
+                "errors": []
+            }
+        
+        return validation_results
+        
+    except Exception as e:
+        logger.error(f"Configuration validation failed: {str(e)}")
+        return {
+            "success": False,
+            "error": f"Configuration validation failed: {str(e)}",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+
+
+@router.get("/config/current", response_model=Dict[str, Any])
+async def get_current_configuration(
+    include_sensitive: bool = Query(
+        False, 
+        description="Include sensitive configuration values (API keys, secrets)"
+    ),
+    config_section: Optional[str] = Query(
+        None,
+        description="Specific configuration section to return"
+    )
+) -> Dict[str, Any]:
+    """
+    Get current configuration settings with optional filtering.
+    
+    Returns current configuration values with the option to exclude
+    sensitive information for security purposes.
+    """
+    from ..api.common.configuration import config_manager
+    
+    try:
+        # Get all configuration settings
+        all_settings = config_manager.get_all_settings()
+        
+        # Filter to specific section if requested
+        if config_section:
+            if config_section not in all_settings:
+                return {
+                    "success": False,
+                    "error": f"Invalid configuration section: {config_section}",
+                    "available_sections": list(all_settings.keys())
+                }
+            all_settings = {config_section: all_settings[config_section]}
+        
+        # Filter sensitive information if not explicitly requested
+        if not include_sensitive:
+            # List of sensitive field patterns
+            sensitive_patterns = [
+                "api_key", "secret", "password", "token", "url", "endpoint"
+            ]
+            
+            for section_name, section_config in all_settings.items():
+                if isinstance(section_config, dict):
+                    for key, value in list(section_config.items()):
+                        # Check if field name matches sensitive patterns
+                        if any(pattern in key.lower() for pattern in sensitive_patterns):
+                            if value is not None:
+                                section_config[key] = "***REDACTED***"
+        
+        return {
+            "success": True,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "configuration": all_settings,
+            "metadata": {
+                "sections_included": len(all_settings),
+                "sensitive_data_included": include_sensitive
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to retrieve configuration: {str(e)}")
+        return {
+            "success": False,
+            "error": f"Failed to retrieve configuration: {str(e)}",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+
+
+@router.post("/config/reload", response_model=Dict[str, Any])
+async def reload_configuration() -> Dict[str, Any]:
+    """
+    Reload configuration from environment variables.
+    
+    This endpoint reloads all configuration classes from current
+    environment variables and validates the new configuration.
+    """
+    from ..api.common.configuration import config_manager
+    
+    try:
+        # Store previous configuration for comparison
+        previous_config = config_manager.get_all_settings()
+        
+        # Reload configurations
+        config_manager.reload_configurations()
+        
+        # Get new configuration
+        new_config = config_manager.get_all_settings()
+        
+        # Compare configurations to identify changes
+        changes = []
+        for section_name in previous_config:
+            if section_name in new_config:
+                prev_section = previous_config[section_name]
+                new_section = new_config[section_name]
+                
+                for key in prev_section:
+                    if key in new_section:
+                        if prev_section[key] != new_section[key]:
+                            changes.append({
+                                "section": section_name,
+                                "setting": key,
+                                "previous_value": prev_section[key],
+                                "new_value": new_section[key]
+                            })
+        
+        return {
+            "success": True,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "reload_summary": {
+                "sections_reloaded": len(new_config),
+                "changes_detected": len(changes)
+            },
+            "configuration_changes": changes,
+            "message": "Configuration reloaded successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"Configuration reload failed: {str(e)}")
+        return {
+            "success": False,
+            "error": f"Configuration reload failed: {str(e)}",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+
+
+@router.get("/performance/statistics", response_model=Dict[str, Any])
+async def get_performance_statistics(
+    endpoint: Optional[str] = Query(
+        None,
+        description="Specific endpoint to get performance statistics for"
+    ),
+    include_detailed: bool = Query(
+        True,
+        description="Include detailed per-endpoint statistics"
+    )
+) -> Dict[str, Any]:
+    """
+    Get comprehensive API performance statistics.
+    
+    Returns performance metrics including response times, error rates,
+    cache hit rates, and operational statistics across all endpoints.
+    """
+    from ..services.api_performance_monitor import get_performance_statistics
+    from ..api.common.configuration import config_manager
+    
+    try:
+        stats = get_performance_statistics(endpoint)
+        
+        if not include_detailed and "endpoint_statistics" in stats:
+            # Remove detailed endpoint stats if not requested
+            endpoint_count = len(stats["endpoint_statistics"])
+            del stats["endpoint_statistics"]
+            stats["summary"] = {
+                "total_endpoints_monitored": endpoint_count,
+                "detailed_stats_included": False
+            }
+        
+        return {
+            "success": True,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "performance_data": stats,
+            "monitoring_config": {
+                "performance_tracking_enabled": config_manager.monitoring.enable_performance_tracking,
+                "error_tracking_enabled": config_manager.monitoring.enable_error_tracking,
+                "alerting_enabled": config_manager.monitoring.enable_alerting,
+                "sample_rate": config_manager.monitoring.performance_sample_rate
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to retrieve performance statistics: {str(e)}")
+        return {
+            "success": False,
+            "error": f"Failed to retrieve performance statistics: {str(e)}",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+
+
+@router.post("/performance/reset", response_model=Dict[str, Any])
+async def reset_performance_statistics(
+    endpoint: Optional[str] = Query(
+        None,
+        description="Specific endpoint to reset statistics for (leave empty to reset all)"
+    )
+) -> Dict[str, Any]:
+    """
+    Reset performance statistics for monitoring.
+    
+    This endpoint allows resetting performance metrics for specific endpoints
+    or all endpoints to start fresh measurement periods.
+    """
+    from ..services.api_performance_monitor import performance_monitor
+    
+    try:
+        performance_monitor.reset_statistics(endpoint)
+        
+        return {
+            "success": True,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "message": f"Performance statistics reset successfully for {'all endpoints' if not endpoint else f'endpoint: {endpoint}'}",
+            "reset_scope": "all_endpoints" if not endpoint else "single_endpoint",
+            "endpoint": endpoint
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to reset performance statistics: {str(e)}")
+        return {
+            "success": False,
+            "error": f"Failed to reset performance statistics: {str(e)}",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+
+
+@router.get("/performance/alerts", response_model=Dict[str, Any])  
+async def get_performance_alerts() -> Dict[str, Any]:
+    """
+    Get current performance alert status and thresholds.
+    
+    Returns information about active performance monitoring alerts,
+    thresholds, and alert history.
+    """
+    from ..services.api_performance_monitor import performance_monitor
+    from ..api.common.configuration import config_manager
+    
+    try:
+        config = config_manager.monitoring
+        
+        # Get recent alert timestamps
+        recent_alerts = {}
+        now = datetime.utcnow()
+        
+        for alert_key, alert_time in performance_monitor.alert_timestamps.items():
+            if (now - alert_time).total_seconds() < 86400:  # Last 24 hours
+                recent_alerts[alert_key] = {
+                    "timestamp": alert_time.isoformat() + "Z",
+                    "minutes_ago": int((now - alert_time).total_seconds() / 60)
+                }
+        
+        return {
+            "success": True,
+            "timestamp": now.isoformat() + "Z",
+            "alerting_status": {
+                "enabled": config.enable_alerting,
+                "error_rate_threshold": config.error_rate_alert_threshold,
+                "response_time_threshold_ms": config.response_time_alert_threshold_ms,
+                "cooldown_minutes": config.alert_cooldown_minutes
+            },
+            "recent_alerts": recent_alerts,
+            "alert_summary": {
+                "total_alert_types": len(recent_alerts),
+                "external_monitoring_enabled": config.external_monitoring_enabled
+            },
+            "monitoring_health": {
+                "performance_tracking": config.enable_performance_tracking,
+                "error_tracking": config.enable_error_tracking,
+                "resource_monitoring": config.enable_resource_monitoring
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to retrieve performance alerts: {str(e)}")
+        return {
+            "success": False,
+            "error": f"Failed to retrieve performance alerts: {str(e)}",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
         }

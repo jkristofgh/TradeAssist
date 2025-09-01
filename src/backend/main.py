@@ -94,6 +94,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await partition_manager.start_partition_management()
     await performance_monitoring.start_monitoring()
     
+    # Start API standardization performance monitoring (Phase 3)
+    from .services.api_performance_monitor import start_performance_monitoring
+    await start_performance_monitoring()
+    logger.info("API standardization performance monitoring started")
+    
     logger.info("TradeAssist application started successfully")
     
     try:
@@ -103,6 +108,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Shutting down TradeAssist application")
         
         # Stop services in reverse order
+        # Stop API standardization performance monitoring
+        from .services.api_performance_monitor import stop_performance_monitoring
+        await stop_performance_monitoring()
+        
         await performance_monitoring.stop_monitoring()
         await partition_manager.stop_partition_management()
         await analytics_engine.stop()
@@ -129,6 +138,10 @@ def create_app() -> FastAPI:
         version="1.0.0",
         lifespan=lifespan,
     )
+    
+    # Set up enhanced OpenAPI documentation (Phase 3)
+    from .api.common.openapi_generator import setup_enhanced_openapi
+    setup_enhanced_openapi(app)
     
     # Configure CORS for frontend access
     app.add_middleware(

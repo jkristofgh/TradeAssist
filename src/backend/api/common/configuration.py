@@ -519,11 +519,193 @@ class CacheConfig(BaseSettings):
         case_sensitive = False
 
 
+class MonitoringConfig(BaseSettings):
+    """
+    Configuration for monitoring, alerting, and error tracking.
+    
+    Centralizes monitoring settings and provides environment-based configuration
+    for operational excellence.
+    """
+    
+    # Error tracking configuration
+    enable_error_tracking: bool = Field(
+        default=True,
+        description="Enable structured error tracking",
+        env="MONITORING_ENABLE_ERROR_TRACKING"
+    )
+    
+    error_sample_rate: float = Field(
+        default=1.0,
+        description="Error tracking sample rate (0.0-1.0)",
+        env="MONITORING_ERROR_SAMPLE_RATE"
+    )
+    
+    max_error_details_length: int = Field(
+        default=1000,
+        description="Maximum length of error detail strings",
+        env="MONITORING_MAX_ERROR_DETAILS_LENGTH"
+    )
+    
+    # Performance monitoring configuration
+    enable_performance_tracking: bool = Field(
+        default=True,
+        description="Enable performance metrics collection",
+        env="MONITORING_ENABLE_PERFORMANCE_TRACKING"
+    )
+    
+    performance_sample_rate: float = Field(
+        default=1.0,
+        description="Performance tracking sample rate (0.0-1.0)",
+        env="MONITORING_PERFORMANCE_SAMPLE_RATE"
+    )
+    
+    slow_query_threshold_ms: float = Field(
+        default=1000.0,
+        description="Threshold for slow query logging in milliseconds",
+        env="MONITORING_SLOW_QUERY_THRESHOLD_MS"
+    )
+    
+    slow_request_threshold_ms: float = Field(
+        default=2000.0,
+        description="Threshold for slow request logging in milliseconds",
+        env="MONITORING_SLOW_REQUEST_THRESHOLD_MS"
+    )
+    
+    # Alerting configuration
+    enable_alerting: bool = Field(
+        default=False,
+        description="Enable alerting notifications",
+        env="MONITORING_ENABLE_ALERTING"
+    )
+    
+    error_rate_alert_threshold: float = Field(
+        default=0.05,  # 5% error rate
+        description="Error rate threshold for alerts (0.0-1.0)",
+        env="MONITORING_ERROR_RATE_ALERT_THRESHOLD"
+    )
+    
+    response_time_alert_threshold_ms: float = Field(
+        default=5000.0,  # 5 seconds
+        description="Response time threshold for alerts in milliseconds",
+        env="MONITORING_RESPONSE_TIME_ALERT_THRESHOLD_MS"
+    )
+    
+    alert_cooldown_minutes: int = Field(
+        default=15,
+        description="Cooldown period between similar alerts in minutes",
+        env="MONITORING_ALERT_COOLDOWN_MINUTES"
+    )
+    
+    # Metrics collection configuration
+    metrics_retention_days: int = Field(
+        default=30,
+        description="Number of days to retain metrics data",
+        env="MONITORING_METRICS_RETENTION_DAYS"
+    )
+    
+    metrics_aggregation_interval_seconds: int = Field(
+        default=60,  # 1 minute
+        description="Interval for metrics aggregation in seconds",
+        env="MONITORING_METRICS_AGGREGATION_INTERVAL_SECONDS"
+    )
+    
+    enable_detailed_metrics: bool = Field(
+        default=True,
+        description="Enable detailed per-endpoint metrics collection",
+        env="MONITORING_ENABLE_DETAILED_METRICS"
+    )
+    
+    # Configuration change monitoring
+    enable_config_change_logging: bool = Field(
+        default=True,
+        description="Enable configuration change audit logging",
+        env="MONITORING_ENABLE_CONFIG_CHANGE_LOGGING"
+    )
+    
+    config_change_retention_days: int = Field(
+        default=90,
+        description="Number of days to retain configuration change logs",
+        env="MONITORING_CONFIG_CHANGE_RETENTION_DAYS"
+    )
+    
+    # External monitoring integration
+    external_monitoring_enabled: bool = Field(
+        default=False,
+        description="Enable external monitoring system integration",
+        env="MONITORING_EXTERNAL_ENABLED"
+    )
+    
+    external_monitoring_endpoint: Optional[str] = Field(
+        default=None,
+        description="External monitoring system endpoint",
+        env="MONITORING_EXTERNAL_ENDPOINT"
+    )
+    
+    external_monitoring_api_key: Optional[str] = Field(
+        default=None,
+        description="External monitoring system API key",
+        env="MONITORING_EXTERNAL_API_KEY"
+    )
+    
+    # Resource monitoring
+    enable_resource_monitoring: bool = Field(
+        default=True,
+        description="Enable CPU and memory monitoring",
+        env="MONITORING_ENABLE_RESOURCE_MONITORING"
+    )
+    
+    resource_check_interval_seconds: int = Field(
+        default=30,
+        description="Resource monitoring check interval in seconds",
+        env="MONITORING_RESOURCE_CHECK_INTERVAL_SECONDS"
+    )
+    
+    memory_usage_alert_threshold_mb: int = Field(
+        default=1024,  # 1GB
+        description="Memory usage threshold for alerts in MB",
+        env="MONITORING_MEMORY_USAGE_ALERT_THRESHOLD_MB"
+    )
+    
+    cpu_usage_alert_threshold_percent: float = Field(
+        default=80.0,
+        description="CPU usage threshold for alerts in percent",
+        env="MONITORING_CPU_USAGE_ALERT_THRESHOLD_PERCENT"
+    )
+    
+    @validator("error_sample_rate", "performance_sample_rate", "error_rate_alert_threshold")
+    def validate_rate_values(cls, v):
+        """Ensure rate values are between 0.0 and 1.0."""
+        if not (0.0 <= v <= 1.0):
+            raise ValueError("Rate values must be between 0.0 and 1.0")
+        return v
+    
+    @validator("cpu_usage_alert_threshold_percent")
+    def validate_cpu_threshold(cls, v):
+        """Ensure CPU threshold is reasonable."""
+        if not (0.0 <= v <= 100.0):
+            raise ValueError("CPU usage threshold must be between 0.0 and 100.0")
+        return v
+    
+    @validator("metrics_retention_days", "config_change_retention_days")
+    def validate_retention_days(cls, v):
+        """Ensure retention periods are reasonable."""
+        if v < 1:
+            raise ValueError("Retention days must be at least 1")
+        if v > 365:
+            raise ValueError("Retention days cannot exceed 365")
+        return v
+    
+    class Config:
+        env_prefix = "TRADEASSIST_"
+        case_sensitive = False
+
+
 # Global configuration instances
 api_limits_config = APILimitsConfig()
 validation_config = ValidationConfig()
 technical_indicator_config = TechnicalIndicatorConfig()
 cache_config = CacheConfig()
+monitoring_config = MonitoringConfig()
 
 
 class ConfigurationManager:
@@ -540,6 +722,7 @@ class ConfigurationManager:
         self.validation = validation_config
         self.indicators = technical_indicator_config
         self.cache = cache_config
+        self.monitoring = monitoring_config
         
         # Validate cross-configuration dependencies
         self._validate_configurations()
@@ -568,10 +751,11 @@ class ConfigurationManager:
             Dict containing all configuration values
         """
         return {
-            "api_limits": self.api_limits.dict(),
-            "validation": self.validation.dict(),
-            "indicators": self.indicators.dict(),
-            "cache": self.cache.dict()
+            "api_limits": self.api_limits.model_dump(),
+            "validation": self.validation.model_dump(),
+            "indicators": self.indicators.model_dump(),
+            "cache": self.cache.model_dump(),
+            "monitoring": self.monitoring.model_dump()
         }
     
     def reload_configurations(self):
@@ -580,6 +764,7 @@ class ConfigurationManager:
         self.validation = ValidationConfig()
         self.indicators = TechnicalIndicatorConfig()
         self.cache = CacheConfig()
+        self.monitoring = MonitoringConfig()
         self._validate_configurations()
 
 
