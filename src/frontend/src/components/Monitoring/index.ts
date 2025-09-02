@@ -8,24 +8,25 @@ export { default as PerformanceMetrics } from './PerformanceMetrics';
 export { default as ConfigurationManager } from './ConfigurationManager';
 
 // Re-export types for external use
-export type {
-  ResponseTimeStats,
-  CacheStats,
-  GlobalStats,
-  EndpointStats,
-  PerformanceData,
-  MonitoringConfig,
-  PerformanceMetricsResponse
-} from './PerformanceMetrics';
+// Temporarily commented out to fix compilation issues
+// export type {
+//   ResponseTimeStats,
+//   CacheStats,
+//   GlobalStats,
+//   EndpointStats,
+//   PerformanceData,
+//   MonitoringConfig,
+//   PerformanceMetricsResponse
+// } from './PerformanceMetrics';
 
-export type {
-  ConfigSection,
-  Configuration,
-  ValidationSummary,
-  SectionDetail,
-  CrossSectionValidation,
-  ConfigurationValidationResponse,
-  ConfigurationResponse,
-  ConfigurationChange,
-  ReloadResponse
-} from './ConfigurationManager';
+// export type {
+//   ConfigSection,
+//   Configuration,
+//   ValidationSummary,
+//   SectionDetail,
+//   CrossSectionValidation,
+//   ConfigurationValidationResponse,
+//   ConfigurationResponse,
+//   ConfigurationChange,
+//   ReloadResponse
+// } from './ConfigurationManager';

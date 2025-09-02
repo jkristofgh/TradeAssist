@@ -44,7 +44,7 @@ export const InstrumentWatchlist: React.FC<InstrumentWatchlistProps> = ({
 }) => {
   // Fetch instruments from API
   const {
-    data: instruments = [],
+    data: instrumentsData,
     isLoading,
     error,
     refetch
@@ -54,6 +54,12 @@ export const InstrumentWatchlist: React.FC<InstrumentWatchlistProps> = ({
     refetchInterval: 30000, // Refetch every 30 seconds as fallback
     staleTime: 10000 // Consider data fresh for 10 seconds
   });
+
+  // Ensure instruments is always an array
+  const instruments = useMemo(() => 
+    Array.isArray(instrumentsData) ? instrumentsData : [], 
+    [instrumentsData]
+  );
 
   // Limit instruments for performance
   const limitedInstruments = useMemo(() => 

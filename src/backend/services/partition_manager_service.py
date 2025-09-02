@@ -196,25 +196,36 @@ class PartitionManagerService:
                    end_date=end_date)
         
         async with get_db_session() as session:
-            # Create partition table
-            partition_sql = f"""
+            # Create partition table with SQLite-compatible syntax
+            create_table_sql = f"""
             CREATE TABLE IF NOT EXISTS {partition_name} (
-                LIKE market_data INCLUDING ALL
-            );
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp DATETIME NOT NULL,
+                instrument_id INTEGER NOT NULL,
+                price FLOAT,
+                volume INTEGER,
+                bid FLOAT,
+                ask FLOAT,
+                bid_size INTEGER,
+                ask_size INTEGER,
+                open_price FLOAT,
+                high_price FLOAT,
+                low_price FLOAT,
+                deleted_at DATETIME,
+                FOREIGN KEY (instrument_id) REFERENCES instruments (id) ON DELETE CASCADE,
+                CHECK (timestamp >= '{start_date}' AND timestamp <= '{end_date} 23:59:59')
+            )"""
             
-            -- Add CHECK constraint for partition boundaries
-            ALTER TABLE {partition_name} ADD CONSTRAINT {partition_name}_check
-            CHECK (timestamp >= '{start_date}' AND timestamp <= '{end_date} 23:59:59');
+            index1_sql = f"""CREATE INDEX IF NOT EXISTS ix_{partition_name}_timestamp_instrument 
+            ON {partition_name} (timestamp, instrument_id)"""
             
-            -- Create optimized indexes (Phase 1 pattern)
-            CREATE INDEX IF NOT EXISTS ix_{partition_name}_timestamp_instrument 
-            ON {partition_name} (timestamp, instrument_id);
+            index2_sql = f"""CREATE INDEX IF NOT EXISTS ix_{partition_name}_instrument_price 
+            ON {partition_name} (instrument_id, price)"""
             
-            CREATE INDEX IF NOT EXISTS ix_{partition_name}_instrument_price 
-            ON {partition_name} (instrument_id, price);
-            """
-            
-            await session.execute(text(partition_sql))
+            # Execute each statement separately
+            await session.execute(text(create_table_sql))
+            await session.execute(text(index1_sql))
+            await session.execute(text(index2_sql))
             await session.commit()
         
         # Add to partition tracking
@@ -261,31 +272,41 @@ class PartitionManagerService:
                    end_date=end_date)
         
         async with get_db_session() as session:
-            # Create partition table
-            partition_sql = f"""
+            # Create partition table with explicit SQLite-compatible schema
+            create_table_sql = f"""
             CREATE TABLE IF NOT EXISTS {partition_name} (
-                LIKE alert_logs INCLUDING ALL
-            );
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp DATETIME NOT NULL,
+                rule_id INTEGER NOT NULL,
+                instrument_id INTEGER NOT NULL,
+                trigger_value FLOAT NOT NULL,
+                threshold_value FLOAT NOT NULL,
+                fired_status VARCHAR(20) NOT NULL DEFAULT 'FIRED',
+                delivery_status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+                evaluation_time_ms INTEGER,
+                rule_condition VARCHAR(20) NOT NULL,
+                alert_message TEXT,
+                error_message TEXT,
+                delivery_attempted_at DATETIME,
+                delivery_completed_at DATETIME,
+                deleted_at DATETIME,
+                FOREIGN KEY (rule_id) REFERENCES alert_rules (id) ON DELETE CASCADE,
+                FOREIGN KEY (instrument_id) REFERENCES instruments (id) ON DELETE CASCADE,
+                CHECK (timestamp >= '{start_date}' AND timestamp <= '{end_date} 23:59:59')
+            )"""
             
-            -- Add CHECK constraint for partition boundaries
-            ALTER TABLE {partition_name} ADD CONSTRAINT {partition_name}_check
-            CHECK (timestamp >= '{start_date}' AND timestamp <= '{end_date} 23:59:59');
+            await session.execute(text(create_table_sql))
             
-            -- Create optimized indexes (Phase 1 pattern)
-            CREATE INDEX IF NOT EXISTS ix_{partition_name}_timestamp 
-            ON {partition_name} (timestamp);
+            # Create optimized indexes
+            index_sqls = [
+                f"CREATE INDEX IF NOT EXISTS ix_{partition_name}_timestamp ON {partition_name} (timestamp)",
+                f"CREATE INDEX IF NOT EXISTS ix_{partition_name}_rule_timestamp ON {partition_name} (rule_id, timestamp)",
+                f"CREATE INDEX IF NOT EXISTS ix_{partition_name}_timestamp_instrument ON {partition_name} (timestamp, instrument_id)",
+                f"CREATE INDEX IF NOT EXISTS ix_{partition_name}_status ON {partition_name} (fired_status, delivery_status)"
+            ]
             
-            CREATE INDEX IF NOT EXISTS ix_{partition_name}_rule_timestamp 
-            ON {partition_name} (rule_id, timestamp);
-            
-            CREATE INDEX IF NOT EXISTS ix_{partition_name}_timestamp_instrument 
-            ON {partition_name} (timestamp, instrument_id);
-            
-            CREATE INDEX IF NOT EXISTS ix_{partition_name}_status 
-            ON {partition_name} (fired_status, delivery_status);
-            """
-            
-            await session.execute(text(partition_sql))
+            for index_sql in index_sqls:
+                await session.execute(text(index_sql))
             await session.commit()
         
         # Add to partition tracking

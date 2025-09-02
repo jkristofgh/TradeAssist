@@ -174,7 +174,12 @@ class HistoricalDataService:
         logger.info(f"Fetching data for {len(request.symbols)} symbols")
         
         try:
+            logger.debug(f"DEBUG: Entering fetch_historical_data with request: {request}")
+            logger.debug(f"DEBUG: Request symbols: {request.symbols}")
+            logger.debug(f"DEBUG: Request frequency: {request.frequency}")
+            logger.debug(f"About to validate request for {len(request.symbols)} symbols")
             validated_request = await self.query_manager.validate_request(request)
+            logger.debug("Request validation completed successfully")
             results = []
             
             for symbol in validated_request.symbols:
@@ -197,11 +202,18 @@ class HistoricalDataService:
                         continue
                         
                     # Fetch fresh data
-                    raw_data = await self.fetcher.fetch_symbol_data(
-                        symbol=symbol, start_date=validated_request.start_date, end_date=validated_request.end_date,
-                        frequency=validated_request.frequency, include_extended_hours=validated_request.include_extended_hours,
-                        max_records=validated_request.max_records
-                    )
+                    try:
+                        raw_data = await self.fetcher.fetch_symbol_data(
+                            symbol=symbol, start_date=validated_request.start_date, end_date=validated_request.end_date,
+                            frequency=validated_request.frequency, include_extended_hours=validated_request.include_extended_hours,
+                            max_records=validated_request.max_records
+                        )
+                    except Exception as fetch_error:
+                        logger.error(f"Fetcher error for {symbol}: {type(fetch_error).__name__}: {fetch_error}")
+                        logger.error(f"Error details: {repr(fetch_error)}")
+                        import traceback
+                        logger.error(f"Traceback: {traceback.format_exc()}")
+                        raise
                     
                     if raw_data:
                         validation_result = await self.validator.validate_market_data(raw_data)

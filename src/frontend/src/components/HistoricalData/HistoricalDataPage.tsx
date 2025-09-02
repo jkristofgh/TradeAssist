@@ -300,7 +300,7 @@ const HistoricalDataPage: React.FC<HistoricalDataPageProps> = ({ defaultTab = 'n
             <QueryForm
               onSubmit={handleQuerySubmit}
               isLoading={isLoading}
-              frequencies={frequencies.map(f => f as DataFrequency)}
+              frequencies={Array.isArray(frequencies) ? frequencies.map(f => f as DataFrequency) : []}
               initialValues={currentQuery ? {
                 symbols: currentQuery.symbols.join(', '),
                 frequency: currentQuery.frequency,

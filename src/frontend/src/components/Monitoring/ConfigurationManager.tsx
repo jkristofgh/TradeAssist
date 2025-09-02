@@ -17,11 +17,11 @@ import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../common/Tabs';
 
-interface ConfigSection {
+export interface ConfigSection {
   [key: string]: any;
 }
 
-interface Configuration {
+export interface Configuration {
   api_limits: ConfigSection;
   validation: ConfigSection;
   indicators: ConfigSection;
@@ -29,34 +29,35 @@ interface Configuration {
   monitoring: ConfigSection;
 }
 
-interface ValidationSummary {
+export interface ValidationSummary {
   total_sections: number;
   valid_sections: number;
   invalid_sections: number;
   warnings: number;
 }
 
-interface SectionDetail {
+export interface SectionDetail {
   valid: boolean;
   errors: string[];
   warnings: string[];
   settings_count: number;
 }
 
-interface CrossSectionValidation {
+export interface CrossSectionValidation {
   valid: boolean;
   errors: string[];
 }
 
-interface ConfigurationValidationResponse {
+export interface ConfigurationValidationResponse {
   success: boolean;
   timestamp: string;
   validation_summary: ValidationSummary;
   section_details: Record<string, SectionDetail>;
   cross_section_validation: CrossSectionValidation;
+  error?: string;
 }
 
-interface ConfigurationResponse {
+export interface ConfigurationResponse {
   success: boolean;
   timestamp: string;
   configuration: Configuration;
@@ -66,14 +67,14 @@ interface ConfigurationResponse {
   };
 }
 
-interface ConfigurationChange {
+export interface ConfigurationChange {
   section: string;
   setting: string;
   previous_value: any;
   new_value: any;
 }
 
-interface ReloadResponse {
+export interface ReloadResponse {
   success: boolean;
   timestamp: string;
   reload_summary: {

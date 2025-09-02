@@ -92,7 +92,19 @@ class ConnectionManager:
             )
         )
         
-        await self.send_personal_message(welcome_message, client_id)
+        # Convert ConnectionMessage to dict for JSON serialization
+        welcome_dict = {
+            "type": "connection",
+            "data": {
+                "client_id": client_id,
+                "connected_at": datetime.utcnow().isoformat(),
+                "subscriptions": [],
+                "last_heartbeat": datetime.utcnow().isoformat(),
+                "connection_quality": "good"
+            }
+        }
+        
+        await self.send_personal_message(websocket, welcome_dict)
         
         return True, client_id
     
@@ -136,7 +148,7 @@ class ConnectionManager:
             await websocket.send_text(json.dumps(message, default=str))
         except Exception as e:
             logger.warning(f"Failed to send personal message: {e}")
-            self.disconnect(websocket)
+            self.disconnect_websocket(websocket)
     
     async def broadcast(self, message: dict) -> None:
         """
@@ -708,7 +720,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         None,
                         "error"
                     )
-                    await manager.send_personal_message(error_msg, client_id)
+                    await manager.send_personal_message(websocket, error_msg)
                 
             except WebSocketDisconnect:
                 break
@@ -721,7 +733,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     None,
                     "critical"
                 )
-                await manager.send_personal_message(error_msg, client_id)
+                await manager.send_personal_message(websocket, error_msg)
                 break
     
     finally:

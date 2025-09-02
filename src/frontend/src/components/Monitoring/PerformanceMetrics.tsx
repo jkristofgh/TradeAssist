@@ -16,7 +16,7 @@ import { Alert, AlertDescription } from '../common/Alert';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 
-interface ResponseTimeStats {
+export interface ResponseTimeStats {
   mean: number;
   median: number;
   p95: number;
@@ -25,13 +25,13 @@ interface ResponseTimeStats {
   max: number;
 }
 
-interface CacheStats {
+export interface CacheStats {
   hits: number;
   misses: number;
   hit_rate: number;
 }
 
-interface GlobalStats {
+export interface GlobalStats {
   total_requests: number;
   error_count: number;
   error_rate: number;
@@ -40,23 +40,23 @@ interface GlobalStats {
   uptime_seconds: number;
 }
 
-interface EndpointStats {
+export interface EndpointStats {
   [endpoint: string]: GlobalStats;
 }
 
-interface PerformanceData {
+export interface PerformanceData {
   global_statistics: GlobalStats;
   endpoint_statistics: EndpointStats;
 }
 
-interface MonitoringConfig {
+export interface MonitoringConfig {
   performance_tracking_enabled: boolean;
   error_tracking_enabled: boolean;
   alerting_enabled: boolean;
   sample_rate: number;
 }
 
-interface PerformanceMetricsResponse {
+export interface PerformanceMetricsResponse {
   success: boolean;
   timestamp: string;
   performance_data: PerformanceData;
@@ -143,13 +143,13 @@ const PerformanceMetrics: React.FC = () => {
     });
   };
 
-  const getErrorRateBadgeColor = (errorRate: number): string => {
+  const getErrorRateBadgeColor = (errorRate: number): "success" | "warning" | "destructive" => {
     if (errorRate < 0.01) return 'success';
     if (errorRate < 0.05) return 'warning';
     return 'destructive';
   };
 
-  const getCacheHitRateBadgeColor = (hitRate: number): string => {
+  const getCacheHitRateBadgeColor = (hitRate: number): "success" | "warning" | "destructive" => {
     if (hitRate > 0.8) return 'success';
     if (hitRate > 0.6) return 'warning';
     return 'destructive';

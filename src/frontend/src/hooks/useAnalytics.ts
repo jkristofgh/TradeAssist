@@ -410,7 +410,7 @@ export function useMultiInstrumentAnalytics(
 // UTILITY FUNCTIONS
 // =============================================================================
 
-function getAnalyticsQueryKey(type: AnalyticsDataType, request: any): any[] {
+function getAnalyticsQueryKey(type: AnalyticsDataType, request: any): readonly any[] {
   switch (type) {
     case 'market-analysis':
       return queryKeys.analytics.marketAnalysis(request);

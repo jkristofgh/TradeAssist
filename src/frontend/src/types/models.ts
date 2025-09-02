@@ -129,30 +129,36 @@ export interface AnalyticsRequest {
   instrumentId: number;
   lookbackHours?: number; // Default 24, range 1-8760
   indicators?: string[] | null;
+  timeframe?: string;
+  lookbackPeriod?: number;
 }
 
 export interface PredictionRequest {
   instrumentId: number;
   predictionHorizon: number; // hours
   modelType?: string;
+  confidenceLevel?: number;
 }
 
 export interface RiskRequest {
   instrumentId: number;
   timeframe?: string;
   confidenceLevel?: number;
+  portfolioValue?: number;
 }
 
 export interface StressTestRequest {
   instrumentId: number;
-  scenarios: string[];
+  scenarios: Array<{ name: string; marketShock: number; duration: number }>;
   timeframe?: string;
+  portfolioValue?: number;
 }
 
 export interface VolumeProfileRequest {
   instrumentId: number;
   timeframe?: string;
-  binSize?: number;
+  priceSegments?: number;
+  includePointOfControl?: boolean;
 }
 
 // Technical Indicator Responses

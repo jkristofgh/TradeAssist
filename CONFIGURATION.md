@@ -1,697 +1,606 @@
-# TradeAssist Configuration Guide
+# TradeAssist Configuration Reference
 
-## 🔧 Complete Configuration Reference
+This comprehensive guide covers all configuration options for TradeAssist, including environment variables, application settings, and advanced configuration parameters.
 
-This guide covers all configuration options for TradeAssist, from basic setup to advanced performance tuning.
+## 🔧 Environment Configuration
 
----
+### Setting Up Configuration Files
 
-## 📁 Configuration Files
+```bash
+# Copy the example configuration file
+cp .env.example .env
 
-### Primary Configuration Files
-- **`.env`** - Environment variables and secrets
-- **`alembic.ini`** - Database migration settings
-- **`src/backend/config.py`** - Application configuration class
-- **`src/frontend/package.json`** - Frontend dependencies and scripts
-- **`run.py`** - Main application runner
-- **`start.sh`** - Quick start script
+# Edit the configuration file
+nano .env  # or use your preferred editor
+```
 
-### Secondary Configuration Files
-- **`conftest.py`** - Pytest configuration
-- **`pytest.ini`** - Testing configuration
-- **`requirements.txt`** - Python dependencies
-- **`.gitignore`** - Git ignore rules
-- **`src/frontend/tsconfig.json`** - TypeScript configuration
+**⚠️ Important**: Never commit your actual `.env` file to version control. It contains sensitive credentials.
 
 ---
 
-## 🌍 Environment Variables (.env)
+## 📝 Core Configuration
 
-### Core Application Settings
+### Application Settings
+
+| Variable | Default | Description | Required |
+|----------|---------|-------------|----------|
+| `HOST` | `127.0.0.1` | Server bind address | No |
+| `PORT` | `8000` | Server port number | No |
+| `DEBUG` | `true` | Enable debug mode for development | No |
+| `LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) | No |
 
 ```env
-# Application Environment
-HOST=127.0.0.1                # Server host address
-PORT=8000                      # Server port
-DEBUG=true                     # Enable debug mode (development only)
-LOG_LEVEL=INFO                 # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+# Application Settings
+HOST=127.0.0.1
+PORT=8000
+DEBUG=true
+LOG_LEVEL=INFO
 ```
 
 ### Database Configuration
 
+| Variable | Default | Description | Required |
+|----------|---------|-------------|----------|
+| `DATABASE_URL` | `sqlite+aiosqlite:///./data/trade_assist.db` | Database connection string | No |
+| `MARKET_DATA_RETENTION_DAYS` | `30` | Days to retain market data | No |
+
 ```env
-# SQLite Configuration (Current Default)
+# Database Configuration
 DATABASE_URL=sqlite+aiosqlite:///./data/trade_assist.db
-MARKET_DATA_RETENTION_DAYS=30  # How long to keep market data
-
-# Advanced SQLite Settings
-# DATABASE_ECHO=false            # Log all SQL queries
-# DATABASE_POOL_SIZE=20          # Connection pool size
-# DATABASE_MAX_OVERFLOW=30       # Max overflow connections
-
-# PostgreSQL Configuration (Future)
-# DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/tradeassist
-# DATABASE_SSL_MODE=prefer
+MARKET_DATA_RETENTION_DAYS=30
 ```
 
-### Schwab API Configuration
+**Database URL Formats:**
+- **SQLite**: `sqlite+aiosqlite:///./data/trade_assist.db`
+- **PostgreSQL**: `postgresql+asyncpg://user:password@localhost/tradeassist`
+
+---
+
+## 🔐 API Integration
+
+### Schwab API Configuration (Required)
+
+| Variable | Default | Description | Required |
+|----------|---------|-------------|----------|
+| `SCHWAB_CLIENT_ID` | - | Schwab application client ID | **Yes** |
+| `SCHWAB_CLIENT_SECRET` | - | Schwab application client secret | **Yes** |
+| `SCHWAB_REDIRECT_URI` | `http://localhost:8080/callback` | OAuth callback URL | No |
 
 ```env
-# Schwab API Credentials (Required for real-time data)
+# Schwab API Configuration (Required)
 SCHWAB_CLIENT_ID=your_schwab_client_id_here
 SCHWAB_CLIENT_SECRET=your_schwab_client_secret_here
-SCHWAB_REDIRECT_URI=https://127.0.0.1
-
-# API Rate Limiting
-# SCHWAB_REQUESTS_PER_SECOND=10  # API rate limit
-# SCHWAB_BURST_LIMIT=50          # Burst request limit
-# SCHWAB_TIMEOUT_SECONDS=30      # Request timeout
-# SCHWAB_RETRY_ATTEMPTS=3        # Retry failed requests
+SCHWAB_REDIRECT_URI=http://localhost:8080/callback
 ```
 
-### Historical Data Service Configuration
+**Getting Schwab API Credentials:**
+1. Register at [Schwab Developer Portal](https://developer.schwab.com/)
+2. Create a new application
+3. Note your Client ID and Client Secret
+4. Set the redirect URI to match your configuration
+5. Complete OAuth flow using `authenticate_schwab.py`
+
+### Google Cloud Secret Manager (Optional)
+
+| Variable | Default | Description | Required |
+|----------|---------|-------------|----------|
+| `GOOGLE_APPLICATION_CREDENTIALS` | - | Path to service account JSON file | No |
 
 ```env
-# Historical Data Cache Settings
-HISTORICAL_DATA_CACHE_TTL=300              # Cache TTL in seconds (5 minutes)
-HISTORICAL_DATA_MAX_SYMBOLS_PER_REQUEST=50  # Max symbols per API request
-HISTORICAL_DATA_MAX_RECORDS_DEFAULT=10000   # Default max records per symbol
-
-# API Rate Limiting for Historical Data
-HISTORICAL_DATA_RATE_LIMIT_REQUESTS=100     # Requests per minute limit
-HISTORICAL_DATA_BATCH_SIZE=25               # Batch size for API requests
-HISTORICAL_DATA_RETRY_ATTEMPTS=3            # Retry attempts for failed requests
-HISTORICAL_DATA_RETRY_DELAY=1               # Delay between retries (seconds)
-
-# Database Performance Settings
-DATABASE_QUERY_TIMEOUT=30                   # Query timeout in seconds
-DATABASE_CONNECTION_POOL_SIZE=10            # Connection pool size
-DATABASE_CONNECTION_OVERFLOW=20             # Pool overflow connections
-
-# Cache Backend Configuration
-CACHE_BACKEND=memory                        # Cache type (memory, redis)
-CACHE_REDIS_URL=redis://localhost:6379/0   # Redis URL (if using Redis)
-CACHE_DEFAULT_TTL=300                       # Default cache TTL in seconds
-```
-
-### Google Cloud Secret Manager
-
-```env
-# Google Cloud Configuration
-GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+# Google Cloud Secret Manager (Optional)
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
-SECRET_MANAGER_ENABLED=true
-SECRET_CACHE_TTL=3600          # Cache secrets for 1 hour
-
-# Secret Names in Secret Manager
-SECRET_SCHWAB_APP_KEY=schwab-app-key
-SECRET_SCHWAB_APP_SECRET=schwab-app-secret
-SECRET_SLACK_BOT_TOKEN=slack-bot-token
 ```
 
-### Performance Configuration
+---
+
+## ⚡ Performance Configuration
+
+### WebSocket & Real-time Settings
+
+| Variable | Default | Description | Range |
+|----------|---------|-------------|--------|
+| `MAX_WEBSOCKET_CONNECTIONS` | `10` | Maximum concurrent WebSocket connections | 1-100 |
+| `ALERT_EVALUATION_INTERVAL_MS` | `100` | Alert evaluation frequency | 50-1000 |
+| `DATA_INGESTION_BATCH_SIZE` | `100` | Market data batch processing size | 10-1000 |
 
 ```env
-# WebSocket Settings
-MAX_WEBSOCKET_CONNECTIONS=10   # Maximum concurrent connections
-ALERT_EVALUATION_INTERVAL_MS=100 # Alert evaluation frequency
-DATA_INGESTION_BATCH_SIZE=100  # Batch size for data processing
-
-# Performance Targets
-# ALERT_LATENCY_TARGET_MS=500    # Target alert processing latency
-# MAX_CONCURRENT_ALERTS=50       # Maximum alerts processed concurrently
-# WEBSOCKET_PING_INTERVAL=30     # Ping interval in seconds
-# WEBSOCKET_PING_TIMEOUT=10      # Ping timeout in seconds
+# Performance Configuration
+MAX_WEBSOCKET_CONNECTIONS=10
+ALERT_EVALUATION_INTERVAL_MS=100
+DATA_INGESTION_BATCH_SIZE=100
 ```
 
-### Notification Configuration
+### API Rate Limiting
+
+| Variable | Default | Description | Range |
+|----------|---------|-------------|--------|
+| `TRADEASSIST_API_MAX_REQUESTS_PER_MINUTE` | `100` | Max requests per minute per client | 10-1000 |
+| `TRADEASSIST_API_MAX_REQUESTS_PER_HOUR` | `1000` | Max requests per hour per client | 100-10000 |
+| `TRADEASSIST_API_MAX_CONCURRENT_REQUESTS` | `10` | Max concurrent requests | 1-50 |
+| `TRADEASSIST_API_REQUEST_TIMEOUT_SECONDS` | `30.0` | Request timeout | 5.0-120.0 |
 
 ```env
-# Slack Notifications
-SLACK_BOT_TOKEN=xoxb-your-slack-bot-token-here
+# API Rate Limiting
+TRADEASSIST_API_MAX_REQUESTS_PER_MINUTE=100
+TRADEASSIST_API_MAX_REQUESTS_PER_HOUR=1000
+TRADEASSIST_API_MAX_CONCURRENT_REQUESTS=10
+TRADEASSIST_API_REQUEST_TIMEOUT_SECONDS=30.0
+```
+
+### Pagination Settings
+
+| Variable | Default | Description | Range |
+|----------|---------|-------------|--------|
+| `TRADEASSIST_API_DEFAULT_PAGE_SIZE` | `25` | Default items per page | 10-100 |
+| `TRADEASSIST_API_MAX_PAGE_SIZE` | `100` | Maximum items per page | 50-500 |
+| `TRADEASSIST_API_MAX_PAGE_NUMBER` | `1000` | Maximum page number | 100-10000 |
+
+```env
+# Pagination Settings
+TRADEASSIST_API_DEFAULT_PAGE_SIZE=25
+TRADEASSIST_API_MAX_PAGE_SIZE=100
+TRADEASSIST_API_MAX_PAGE_NUMBER=1000
+```
+
+---
+
+## 🔔 Notification Configuration
+
+### Slack Integration
+
+| Variable | Default | Description | Required |
+|----------|---------|-------------|----------|
+| `SLACK_BOT_TOKEN` | - | Slack Bot User OAuth Token | No |
+| `SLACK_CHANNEL` | `#trading-alerts` | Default Slack channel | No |
+| `SLACK_ENABLED` | `true` | Enable Slack notifications | No |
+
+```env
+# Slack Configuration
+SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
 SLACK_CHANNEL=#trading-alerts
-
-# Sound Alerts
-SOUND_ALERTS_ENABLED=true
-
-# Advanced Notification Settings (Optional)
-# WEBAPP_NOTIFICATIONS=true
-# NOTIFICATION_AUTO_DISMISS=10   # Auto-dismiss notifications after N seconds
-# MAX_VISIBLE_NOTIFICATIONS=5   # Maximum visible notifications
-# NOTIFICATION_RETENTION_DAYS=30 # Keep notifications for N days
-# SOUND_DEFAULT_VOLUME=0.8      # Volume (0.0 to 1.0)
+SLACK_ENABLED=true
 ```
+
+**Setting up Slack Integration:**
+1. Create a Slack app at https://api.slack.com/apps
+2. Add Bot Token Scopes: `chat:write`, `chat:write.public`
+3. Install app to your workspace
+4. Copy the Bot User OAuth Token
+
+### Sound Notifications
+
+| Variable | Default | Description | Options |
+|----------|---------|-------------|---------|
+| `SOUND_ALERTS_ENABLED` | `true` | Enable sound notifications | true/false |
+| `SOUND_ALERT_FILE` | `alert.wav` | Custom alert sound file | Any .wav file |
+| `SOUND_VOLUME` | `0.8` | Alert sound volume | 0.0-1.0 |
+
+```env
+# Sound Notifications
+SOUND_ALERTS_ENABLED=true
+SOUND_ALERT_FILE=alert.wav
+SOUND_VOLUME=0.8
+```
+
+### In-App Notifications
+
+| Variable | Default | Description | Options |
+|----------|---------|-------------|---------|
+| `WEBAPP_NOTIFICATIONS` | `true` | Enable web app notifications | true/false |
+| `NOTIFICATION_RETENTION_DAYS` | `30` | Days to keep notification history | 1-365 |
+
+```env
+# In-App Notifications
+WEBAPP_NOTIFICATIONS=true
+NOTIFICATION_RETENTION_DAYS=30
+```
+
+---
+
+## 📊 Market Data & Instruments
 
 ### Target Instruments
 
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TARGET_FUTURES` | `ES,NQ,YM,CL,GC` | Comma-separated list of future symbols |
+| `TARGET_INDICES` | `SPX,NDX,RUT` | Comma-separated list of index symbols |
+| `TARGET_INTERNALS` | `VIX,TICK,ADD,TRIN` | Comma-separated list of market internal symbols |
+
 ```env
-# Instrument Configuration (comma-separated lists)
-TARGET_FUTURES=ES,NQ,YM,CL,GC  # Futures contracts to monitor
-TARGET_INDICES=SPX,NDX,RUT     # Index symbols to track
-TARGET_INTERNALS=VIX,TICK,ADD,TRIN # Market internals
+# Target Instruments
+TARGET_FUTURES=ES,NQ,YM,CL,GC
+TARGET_INDICES=SPX,NDX,RUT
+TARGET_INTERNALS=VIX,TICK,ADD,TRIN
 ```
 
-### Performance Configuration
+**Available Instruments:**
+- **Futures**: ES (S&P 500), NQ (NASDAQ), YM (Dow), CL (Crude Oil), GC (Gold)
+- **Indices**: SPX (S&P 500), NDX (NASDAQ 100), RUT (Russell 2000)
+- **Internals**: VIX (Volatility), TICK (NYSE TICK), ADD (Advance/Decline), TRIN (Arms Index)
+
+---
+
+## 📈 Technical Indicators Configuration
+
+### RSI (Relative Strength Index)
+
+| Variable | Default | Description | Range |
+|----------|---------|-------------|--------|
+| `TRADEASSIST_INDICATOR_RSI_DEFAULT_PERIOD` | `14` | RSI calculation period | 2-50 |
+| `TRADEASSIST_INDICATOR_RSI_OVERBOUGHT_THRESHOLD` | `70.0` | Overbought level | 60.0-90.0 |
+| `TRADEASSIST_INDICATOR_RSI_OVERSOLD_THRESHOLD` | `30.0` | Oversold level | 10.0-40.0 |
+
+### MACD (Moving Average Convergence Divergence)
+
+| Variable | Default | Description | Range |
+|----------|---------|-------------|--------|
+| `TRADEASSIST_INDICATOR_MACD_FAST_PERIOD` | `12` | Fast EMA period | 5-20 |
+| `TRADEASSIST_INDICATOR_MACD_SLOW_PERIOD` | `26` | Slow EMA period | 15-50 |
+| `TRADEASSIST_INDICATOR_MACD_SIGNAL_PERIOD` | `9` | Signal line period | 5-15 |
+
+### Bollinger Bands
+
+| Variable | Default | Description | Range |
+|----------|---------|-------------|--------|
+| `TRADEASSIST_INDICATOR_BOLLINGER_PERIOD` | `20` | Moving average period | 10-50 |
+| `TRADEASSIST_INDICATOR_BOLLINGER_STD_DEV` | `2.0` | Standard deviation multiplier | 1.0-3.0 |
+
+### Moving Averages
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TRADEASSIST_INDICATOR_SMA_DEFAULT_PERIODS` | `10,20,50,100,200` | Simple MA periods |
+| `TRADEASSIST_INDICATOR_EMA_DEFAULT_PERIODS` | `10,20,50,100,200` | Exponential MA periods |
+
+### Stochastic Oscillator
+
+| Variable | Default | Description | Range |
+|----------|---------|-------------|--------|
+| `TRADEASSIST_INDICATOR_STOCHASTIC_K_PERIOD` | `14` | %K period | 5-30 |
+| `TRADEASSIST_INDICATOR_STOCHASTIC_D_PERIOD` | `3` | %D period | 1-10 |
+| `TRADEASSIST_INDICATOR_STOCHASTIC_OVERBOUGHT` | `80.0` | Overbought level | 70.0-90.0 |
+| `TRADEASSIST_INDICATOR_STOCHASTIC_OVERSOLD` | `20.0` | Oversold level | 10.0-30.0 |
+
+### Volume & ATR
+
+| Variable | Default | Description | Range |
+|----------|---------|-------------|--------|
+| `TRADEASSIST_INDICATOR_VOLUME_SMA_PERIOD` | `20` | Volume SMA period | 10-50 |
+| `TRADEASSIST_INDICATOR_VOLUME_SPIKE_THRESHOLD` | `2.0` | Volume spike multiplier | 1.5-5.0 |
+| `TRADEASSIST_INDICATOR_ATR_PERIOD` | `14` | ATR calculation period | 5-30 |
 
 ```env
-# Server Performance
-UVICORN_WORKERS=1             # Number of worker processes
-UVICORN_HOST=0.0.0.0         # Server host
-UVICORN_PORT=8000            # Server port
-UVICORN_LOG_LEVEL=info       # Logging level
-UVICORN_ACCESS_LOG=true      # Enable access logging
-UVICORN_RELOAD=false         # Auto-reload on code changes (dev only)
-
-# Memory Management
-MAX_MEMORY_USAGE_MB=2048     # Maximum memory usage
-GARBAGE_COLLECTION_THRESHOLD=1000  # GC threshold
-DATA_RETENTION_DAYS=90       # Retain data for N days
-```
-
-### Security Configuration
-
-```env
-# CORS Settings
-CORS_ORIGINS=http://localhost:3000,http://localhost:8000
-CORS_ALLOW_CREDENTIALS=true
-CORS_ALLOW_METHODS=GET,POST,PUT,DELETE,OPTIONS
-CORS_ALLOW_HEADERS=*
-
-# SSL/TLS Configuration
-SSL_ENABLED=true
-SSL_CERT_PATH=/path/to/certificate.pem
-SSL_KEY_PATH=/path/to/private-key.pem
-SSL_CA_CERTS=/path/to/ca-certificates.pem
-
-# Security Headers
-SECURITY_HEADERS_ENABLED=true
-HSTS_MAX_AGE=31536000        # HSTS max age
-CONTENT_SECURITY_POLICY=default-src 'self'
-```
-
-### Production Logging Configuration
-
-```env
-# Core Logging Settings
-LOG_LEVEL=INFO                              # DEBUG, INFO, WARNING, ERROR, CRITICAL
-LOG_TO_FILE=true                           # Enable file logging (false for development)
-LOG_FILE_PATH=./logs/tradeassist.log       # Log file path
-LOG_FORMAT=%(asctime)s - %(name)s - %(levelname)s - %(message)s  # Log format
-
-# Log File Rotation Settings
-LOG_FILE_MAX_SIZE=10485760                 # Max file size in bytes (10MB)
-LOG_FILE_BACKUP_COUNT=5                    # Number of backup files to keep
-
-# Production Logging Features
-# - Structured logging with JSON format in production
-# - File rotation with configurable size and retention
-# - Performance metrics logging for historical data operations
-# - Audit logging for data access and API usage
-# - Error tracking with full context for troubleshooting
-
-# Historical Data Logging (Automatic)
-# - Request/response logging with performance metrics
-# - Cache hit/miss tracking for optimization
-# - Error logging with full context for debugging
-# - Audit trail for data access and queries
+# Technical Indicators Configuration
+TRADEASSIST_INDICATOR_RSI_DEFAULT_PERIOD=14
+TRADEASSIST_INDICATOR_RSI_OVERBOUGHT_THRESHOLD=70.0
+TRADEASSIST_INDICATOR_RSI_OVERSOLD_THRESHOLD=30.0
+TRADEASSIST_INDICATOR_MACD_FAST_PERIOD=12
+TRADEASSIST_INDICATOR_MACD_SLOW_PERIOD=26
+TRADEASSIST_INDICATOR_MACD_SIGNAL_PERIOD=9
+TRADEASSIST_INDICATOR_BOLLINGER_PERIOD=20
+TRADEASSIST_INDICATOR_BOLLINGER_STD_DEV=2.0
 ```
 
 ---
 
-## ⚙️ Advanced Configuration
+## 🗄️ Caching Configuration
 
-### Database Performance Tuning
+### Local Caching
 
-#### SQLite Configuration
-```env
-# SQLite WAL Mode Settings
-SQLITE_WAL_MODE=true
-SQLITE_SYNCHRONOUS=NORMAL     # NORMAL, FULL, OFF
-SQLITE_CACHE_SIZE=10000       # Cache size in KB
-SQLITE_TEMP_STORE=memory      # memory, file
-SQLITE_JOURNAL_MODE=WAL       # DELETE, WAL, MEMORY
-SQLITE_BUSY_TIMEOUT=30000     # Busy timeout in milliseconds
-```
-
-#### Database Connection Pool
-```python
-# src/backend/config.py
-class DatabaseConfig:
-    pool_size: int = 20
-    max_overflow: int = 30
-    pool_timeout: int = 30
-    pool_recycle: int = 3600
-    pool_pre_ping: bool = True
-```
-
-### Market Data Processing
+| Variable | Default | Description | Range |
+|----------|---------|-------------|--------|
+| `TRADEASSIST_CACHE_MARKET_DATA_TTL` | `60` | Market data cache TTL (seconds) | 10-300 |
+| `TRADEASSIST_CACHE_ANALYTICS_TTL` | `300` | Analytics cache TTL (seconds) | 60-3600 |
+| `TRADEASSIST_CACHE_HISTORICAL_DATA_TTL` | `3600` | Historical data cache TTL (seconds) | 300-86400 |
+| `TRADEASSIST_CACHE_MAX_SIZE_MB` | `256` | Maximum cache size | 64-2048 |
+| `TRADEASSIST_CACHE_MAX_ENTRIES` | `10000` | Maximum cache entries | 1000-100000 |
 
 ```env
-# Data Processing Configuration
-MARKET_DATA_BUFFER_SIZE=10000 # Buffer size for market data
-MARKET_DATA_BATCH_SIZE=1000   # Batch processing size
-MARKET_DATA_COMPRESSION=gzip  # Compression for stored data
-MARKET_DATA_SAMPLING_RATE=100 # Sample rate in milliseconds
-
-# Real-time Data Settings
-REALTIME_DATA_ENABLED=true
-REALTIME_THROTTLE_MS=50      # Minimum time between updates
-REALTIME_MAX_UPDATES_PER_SEC=20
-REALTIME_PRIORITY_INSTRUMENTS=ES,NQ,YM,RTY  # High priority instruments
+# Caching Configuration
+TRADEASSIST_CACHE_MARKET_DATA_TTL=60
+TRADEASSIST_CACHE_ANALYTICS_TTL=300
+TRADEASSIST_CACHE_HISTORICAL_DATA_TTL=3600
+TRADEASSIST_CACHE_MAX_SIZE_MB=256
+TRADEASSIST_CACHE_MAX_ENTRIES=10000
 ```
 
-### Circuit Breaker Configuration
+### Redis Cache (Optional)
+
+| Variable | Default | Description | Required |
+|----------|---------|-------------|----------|
+| `TRADEASSIST_CACHE_REDIS_ENABLED` | `false` | Enable Redis caching | No |
+| `TRADEASSIST_CACHE_REDIS_URL` | `redis://localhost:6379/0` | Redis connection URL | No |
+| `TRADEASSIST_CACHE_REDIS_KEY_PREFIX` | `tradeassist:` | Redis key prefix | No |
+| `TRADEASSIST_CACHE_REDIS_CONNECTION_TIMEOUT` | `5` | Connection timeout (seconds) | No |
 
 ```env
-# Circuit Breaker Settings
-CIRCUIT_BREAKER_ENABLED=true
-CIRCUIT_BREAKER_FAILURE_THRESHOLD=5    # Failures before opening
-CIRCUIT_BREAKER_RECOVERY_TIMEOUT=60    # Recovery timeout in seconds
-CIRCUIT_BREAKER_EXPECTED_EXCEPTION=HTTPException
-
-# Service-specific Circuit Breakers
-SCHWAB_API_CIRCUIT_BREAKER=true
-DATABASE_CIRCUIT_BREAKER=true
-NOTIFICATION_CIRCUIT_BREAKER=true
+# Redis Configuration (Optional)
+TRADEASSIST_CACHE_REDIS_ENABLED=false
+TRADEASSIST_CACHE_REDIS_URL=redis://localhost:6379/0
+TRADEASSIST_CACHE_REDIS_KEY_PREFIX=tradeassist:
+TRADEASSIST_CACHE_REDIS_CONNECTION_TIMEOUT=5
 ```
 
-### Machine Learning Configuration
+---
+
+## 📊 Monitoring & Analytics
+
+### Performance Monitoring
+
+| Variable | Default | Description | Options |
+|----------|---------|-------------|---------|
+| `TRADEASSIST_MONITORING_ENABLE_PERFORMANCE_TRACKING` | `true` | Enable performance monitoring | true/false |
+| `TRADEASSIST_MONITORING_PERFORMANCE_SAMPLE_RATE` | `1.0` | Performance sampling rate | 0.0-1.0 |
+| `TRADEASSIST_MONITORING_SLOW_QUERY_THRESHOLD_MS` | `1000.0` | Slow query threshold | 100.0-5000.0 |
+| `TRADEASSIST_MONITORING_SLOW_REQUEST_THRESHOLD_MS` | `2000.0` | Slow request threshold | 500.0-10000.0 |
+
+### Error Tracking
+
+| Variable | Default | Description | Options |
+|----------|---------|-------------|---------|
+| `TRADEASSIST_MONITORING_ENABLE_ERROR_TRACKING` | `true` | Enable error tracking | true/false |
+| `TRADEASSIST_MONITORING_ERROR_SAMPLE_RATE` | `1.0` | Error sampling rate | 0.0-1.0 |
+| `TRADEASSIST_MONITORING_MAX_ERROR_DETAILS_LENGTH` | `1000` | Max error detail length | 100-5000 |
+
+### Alerting
+
+| Variable | Default | Description | Range |
+|----------|---------|-------------|--------|
+| `TRADEASSIST_MONITORING_ENABLE_ALERTING` | `false` | Enable system alerting | true/false |
+| `TRADEASSIST_MONITORING_ERROR_RATE_ALERT_THRESHOLD` | `0.05` | Error rate alert threshold | 0.01-0.50 |
+| `TRADEASSIST_MONITORING_RESPONSE_TIME_ALERT_THRESHOLD_MS` | `5000.0` | Response time alert threshold | 1000.0-30000.0 |
+| `TRADEASSIST_MONITORING_ALERT_COOLDOWN_MINUTES` | `15` | Alert cooldown period | 5-120 |
+
+### Resource Monitoring
+
+| Variable | Default | Description | Range |
+|----------|---------|-------------|--------|
+| `TRADEASSIST_MONITORING_ENABLE_RESOURCE_MONITORING` | `true` | Enable resource monitoring | true/false |
+| `TRADEASSIST_MONITORING_RESOURCE_CHECK_INTERVAL_SECONDS` | `30` | Resource check interval | 10-300 |
+| `TRADEASSIST_MONITORING_MEMORY_USAGE_ALERT_THRESHOLD_MB` | `1024` | Memory alert threshold | 256-8192 |
+| `TRADEASSIST_MONITORING_CPU_USAGE_ALERT_THRESHOLD_PERCENT` | `80.0` | CPU alert threshold | 50.0-95.0 |
 
 ```env
-# ML Model Settings
+# Monitoring Configuration
+TRADEASSIST_MONITORING_ENABLE_PERFORMANCE_TRACKING=true
+TRADEASSIST_MONITORING_PERFORMANCE_SAMPLE_RATE=1.0
+TRADEASSIST_MONITORING_SLOW_QUERY_THRESHOLD_MS=1000.0
+TRADEASSIST_MONITORING_ENABLE_ERROR_TRACKING=true
+TRADEASSIST_MONITORING_ERROR_SAMPLE_RATE=1.0
+```
+
+---
+
+## 🔒 Security Configuration
+
+### Data Validation
+
+| Variable | Default | Description | Range |
+|----------|---------|-------------|--------|
+| `TRADEASSIST_VALIDATION_MIN_LOOKBACK_HOURS` | `1` | Minimum lookback period | 1-24 |
+| `TRADEASSIST_VALIDATION_MAX_LOOKBACK_HOURS` | `8760` | Maximum lookback period | 168-8760 |
+| `TRADEASSIST_VALIDATION_MAX_DATE_RANGE_DAYS` | `365` | Maximum date range | 1-1095 |
+| `TRADEASSIST_VALIDATION_MAX_STRING_LENGTH` | `1000` | Maximum string length | 100-5000 |
+| `TRADEASSIST_VALIDATION_MAX_SYMBOL_LENGTH` | `20` | Maximum symbol length | 5-50 |
+
+### Request Limits
+
+| Variable | Default | Description | Range |
+|----------|---------|-------------|--------|
+| `TRADEASSIST_API_MAX_REQUEST_SIZE_MB` | `10.0` | Maximum request size | 1.0-100.0 |
+| `TRADEASSIST_API_MAX_JSON_DEPTH` | `10` | Maximum JSON nesting depth | 5-20 |
+| `TRADEASSIST_API_DATABASE_QUERY_TIMEOUT_SECONDS` | `15.0` | Database query timeout | 5.0-60.0 |
+| `TRADEASSIST_API_EXTERNAL_API_TIMEOUT_SECONDS` | `10.0` | External API timeout | 5.0-30.0 |
+
+```env
+# Security Configuration
+TRADEASSIST_VALIDATION_MIN_LOOKBACK_HOURS=1
+TRADEASSIST_VALIDATION_MAX_LOOKBACK_HOURS=8760
+TRADEASSIST_VALIDATION_MAX_DATE_RANGE_DAYS=365
+TRADEASSIST_API_MAX_REQUEST_SIZE_MB=10.0
+TRADEASSIST_API_MAX_JSON_DEPTH=10
+```
+
+---
+
+## 🧪 Machine Learning Configuration
+
+### ML Model Settings
+
+| Variable | Default | Description | Options |
+|----------|---------|-------------|---------|
+| `ML_MODELS_ENABLED` | `true` | Enable ML-powered analytics | true/false |
+| `ML_MODEL_REFRESH_INTERVAL` | `24` | Model refresh interval (hours) | 1-168 |
+| `TECHNICAL_INDICATORS_ENABLED` | `true` | Enable technical indicators | true/false |
+
+### Advanced Analytics
+
+| Variable | Default | Description | Range |
+|----------|---------|-------------|--------|
+| `TRADEASSIST_VALIDATION_ALLOWED_CONFIDENCE_LEVELS` | `0.90,0.95,0.99,0.999` | Allowed confidence levels | 0.80-0.999 |
+| `TRADEASSIST_VALIDATION_DEFAULT_CONFIDENCE_LEVEL` | `0.95` | Default confidence level | 0.80-0.999 |
+| `TRADEASSIST_VALIDATION_MAX_CALCULATION_PRECISION` | `8` | Maximum decimal precision | 2-15 |
+
+```env
+# Machine Learning Configuration
 ML_MODELS_ENABLED=true
-ML_MODEL_UPDATE_INTERVAL=3600 # Update models every hour
-ML_PREDICTION_CACHE_TTL=300   # Cache predictions for 5 minutes
-ML_FEATURE_WINDOW_SIZE=100    # Number of data points for features
-ML_CONFIDENCE_THRESHOLD=0.7   # Minimum confidence for predictions
-
-# Specific Model Settings
-PRICE_PREDICTION_MODEL=lstm
-VOLATILITY_MODEL=garch
-SENTIMENT_MODEL=transformer
+ML_MODEL_REFRESH_INTERVAL=24
+TECHNICAL_INDICATORS_ENABLED=true
+TRADEASSIST_VALIDATION_DEFAULT_CONFIDENCE_LEVEL=0.95
 ```
 
 ---
 
-## 📊 Monitoring Configuration
+## 🐳 Docker Configuration
 
-### Metrics and Observability
+### Docker Environment Variables
 
-```env
-# Metrics Configuration
-METRICS_ENABLED=true
-METRICS_PORT=9090
-METRICS_PATH=/metrics
-PROMETHEUS_ENABLED=false     # Enable Prometheus integration
-STATSD_ENABLED=false        # Enable StatsD integration
-STATSD_HOST=localhost
-STATSD_PORT=8125
+When running in Docker containers, ensure the following environment variables are properly set:
 
-# Custom Metrics
-ALERT_LATENCY_HISTOGRAM=true
-API_RESPONSE_TIME_HISTOGRAM=true
-WEBSOCKET_CONNECTION_GAUGE=true
-DATABASE_QUERY_DURATION=true
-```
-
-### Health Check Configuration
-
-```env
-# Health Check Settings
-HEALTH_CHECK_ENABLED=true
-HEALTH_CHECK_PATH=/health
-HEALTH_CHECK_INTERVAL=30     # Health check interval in seconds
-HEALTH_CHECK_TIMEOUT=10      # Timeout for health checks
-
-# Component Health Checks
-CHECK_DATABASE_HEALTH=true
-CHECK_SCHWAB_API_HEALTH=true
-CHECK_WEBSOCKET_HEALTH=true
-CHECK_DISK_SPACE=true
-CHECK_MEMORY_USAGE=true
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  tradeassist:
+    environment:
+      - HOST=0.0.0.0  # Bind to all interfaces in container
+      - PORT=8000
+      - DATABASE_URL=sqlite+aiosqlite:///./data/trade_assist.db
+      - SCHWAB_CLIENT_ID=${SCHWAB_CLIENT_ID}
+      - SCHWAB_CLIENT_SECRET=${SCHWAB_CLIENT_SECRET}
+    env_file:
+      - .env
 ```
 
 ---
 
-## 🎛️ Frontend Configuration
+## 📋 Configuration Validation
 
-### React Application Settings
+### Configuration Checker
 
-#### package.json (Frontend)
-```json
-{
-  "name": "tradeassist-frontend",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "lint": "eslint src --ext .ts,.tsx",
-    "lint:fix": "eslint src --ext .ts,.tsx --fix",
-    "format": "prettier --write src/**/*.{ts,tsx,json,css,md}",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@tanstack/react-query": "^4.24.0",
-    "chart.js": "^4.2.1",
-    "react": "^18.2.0",
-    "react-chartjs-2": "^5.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.8.0",
-    "react-scripts": "5.0.1",
-    "react-toastify": "^11.0.5",
-    "web-vitals": "^3.1.0"
-  },
-  "devDependencies": {
-    "@types/react": "^18.0.28",
-    "@types/react-dom": "^18.0.11",
-    "typescript": "^4.9.5",
-    "prettier": "^2.8.4"
-  }
-}
+TradeAssist includes built-in configuration validation. Access it via:
+
+```bash
+# Check configuration validity
+curl http://localhost:8000/api/config/validate
+
+# Get current configuration (non-sensitive values)
+curl http://localhost:8000/api/config/current
 ```
-
-#### Environment Variables for Frontend
-```env
-# Frontend Configuration (Set via build process)
-REACT_APP_API_BASE_URL=http://localhost:8000
-REACT_APP_WEBSOCKET_URL=ws://localhost:8000/ws
-REACT_APP_ENVIRONMENT=development
-REACT_APP_VERSION=0.1.0
-
-# Feature Flags (Optional)
-# REACT_APP_ENABLE_DEBUG=false
-# REACT_APP_ENABLE_ANALYTICS=true
-# REACT_APP_ENABLE_ML_PREDICTIONS=true
-# REACT_APP_ENABLE_SOUND_ALERTS=true
-```
-
-#### TypeScript Configuration (tsconfig.json)
-```json
-{
-  "compilerOptions": {
-    "target": "es5",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noFallthroughCasesInSwitch": true,
-    "module": "esnext",
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "jsx": "react-jsx"
-  },
-  "include": ["src"]
-}
-```
-
----
-
-## 🧪 Testing Configuration
-
-### Pytest Configuration (pytest.ini)
-
-```ini
-[tool:pytest]
-testpaths = src/tests
-python_files = test_*.py
-python_classes = Test*
-python_functions = test_*
-addopts =
-    -v
-    --strict-markers
-    --tb=short
-    --cov=src
-    --cov-report=html
-    --cov-report=term-missing
-    --cov-fail-under=80
-markers =
-    unit: Unit tests
-    integration: Integration tests
-    performance: Performance tests
-    slow: Slow running tests
-filterwarnings =
-    ignore::DeprecationWarning
-    ignore::PendingDeprecationWarning
-```
-
-### Test Environment Variables
-
-```env
-# Test Configuration
-TEST_DATABASE_URL=sqlite+aiosqlite:///:memory:
-TEST_SCHWAB_API_MOCK=true
-TEST_NOTIFICATION_MOCK=true
-TEST_WEBSOCKET_MOCK=true
-TEST_TIMEOUT=30
-TEST_LOG_LEVEL=DEBUG
-```
-
----
-
-## 🔄 Development vs Production Configurations
-
-### Development Settings (.env.development)
-
-```env
-# Development Environment
-ENVIRONMENT=development
-DEBUG=true
-LOG_LEVEL=DEBUG
-UVICORN_RELOAD=true
-CORS_ORIGINS=http://localhost:3000
-DATABASE_ECHO=true
-SCHWAB_SANDBOX_MODE=true
-
-# Development-specific
-HOT_RELOAD_ENABLED=true
-DEV_TOOLS_ENABLED=true
-MOCK_MARKET_DATA=true
-DISABLE_RATE_LIMITING=true
-```
-
-### Production Settings (.env.production)
-
-```env
-# Production Environment
-ENVIRONMENT=production
-DEBUG=false
-LOG_LEVEL=INFO
-UVICORN_RELOAD=false
-SSL_ENABLED=true
-SECURITY_HEADERS_ENABLED=true
-SCHWAB_SANDBOX_MODE=false
-
-# Production-specific
-RATE_LIMITING_ENABLED=true
-SECURITY_MONITORING=true
-PERFORMANCE_MONITORING=true
-BACKUP_ENABLED=true
-```
-
-### Staging Settings (.env.staging)
-
-```env
-# Staging Environment
-ENVIRONMENT=staging
-DEBUG=false
-LOG_LEVEL=DEBUG
-SCHWAB_SANDBOX_MODE=true
-MOCK_NOTIFICATIONS=true
-
-# Staging-specific
-LOAD_TESTING_ENABLED=true
-PERFORMANCE_PROFILING=true
-```
-
----
-
-## 🔧 Configuration Management
-
-### Loading Configuration
-
-#### Python Configuration Class
-```python
-# src/backend/config.py
-from pydantic import BaseSettings
-from typing import Optional
-
-class Settings(BaseSettings):
-    # Application
-    app_name: str = "TradeAssist"
-    app_version: str = "1.0.0"
-    environment: str = "production"
-    debug: bool = False
-    secret_key: str
-
-    # Database
-    database_url: str = "sqlite+aiosqlite:///./tradeassist.db"
-    database_echo: bool = False
-
-    # Schwab API
-    schwab_app_key: str
-    schwab_app_secret: str
-    schwab_callback_url: str = "https://localhost:8000/callback"
-
-    # Alert Engine
-    alert_latency_target_ms: int = 500
-    max_concurrent_alerts: int = 50
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-
-settings = Settings()
-```
-
-### Configuration Validation
-
-```python
-# Configuration validation
-def validate_config():
-    """Validate critical configuration settings"""
-    errors = []
-
-    if not settings.secret_key:
-        errors.append("SECRET_KEY is required")
-
-    if len(settings.secret_key) < 32:
-        errors.append("SECRET_KEY must be at least 32 characters")
-
-    if not settings.schwab_app_key:
-        errors.append("SCHWAB_APP_KEY is required")
-
-    if settings.alert_latency_target_ms < 100:
-        errors.append("ALERT_LATENCY_TARGET_MS too low (minimum 100ms)")
-
-    if errors:
-        raise ValueError(f"Configuration errors: {', '.join(errors)}")
-```
-
-### Dynamic Configuration Updates
-
-```python
-# Runtime configuration updates
-class DynamicConfig:
-    def __init__(self):
-        self.config_cache = {}
-        self.last_reload = 0
-
-    def reload_config(self):
-        """Reload configuration from environment"""
-        # Reload non-critical settings without restart
-        pass
-
-    def update_alert_settings(self, new_settings: dict):
-        """Update alert engine settings"""
-        # Validate and apply new alert settings
-        pass
-```
-
----
-
-## 📋 Configuration Checklist
-
-### Pre-Deployment Checklist
-
-- [ ] **Environment variables** set correctly for target environment
-- [ ] **Database connection** string configured
-- [ ] **Schwab API credentials** configured and tested
-- [ ] **Google Cloud Secret Manager** setup and accessible
-- [ ] **SSL certificates** installed and configured (production)
-- [ ] **CORS origins** set correctly for frontend access
-- [ ] **Log levels** appropriate for environment
-- [ ] **Alert thresholds** set correctly
-- [ ] **Notification channels** configured and tested
-- [ ] **Performance settings** tuned for expected load
-- [ ] **Security settings** enabled for production
-- [ ] **Backup configuration** verified
-- [ ] **Monitoring** enabled and functional
-
-### Post-Deployment Verification
-
-- [ ] **Health checks** passing
-- [ ] **Database migrations** applied successfully
-- [ ] **WebSocket connections** working
-- [ ] **Real-time data** flowing correctly
-- [ ] **Alert processing** within latency targets
-- [ ] **Notifications** delivering successfully
-- [ ] **Performance metrics** within acceptable ranges
-- [ ] **Error rates** at acceptable levels
-- [ ] **Security scans** completed
-- [ ] **Backup processes** running correctly
-
----
-
-## 🆘 Configuration Troubleshooting
 
 ### Common Configuration Issues
 
-#### Database Connection Problems
+#### 1. Invalid Schwab Credentials
+**Symptoms**: API connection failures, authentication errors
+**Solution**: Verify credentials at Schwab Developer Portal, re-run OAuth flow
+
+#### 2. Database Connection Issues
+**Symptoms**: Database errors, migration failures
+**Solution**: Check database URL format, ensure data directory exists and is writable
+
+#### 3. Performance Issues
+**Symptoms**: High latency, timeouts
+**Solution**: Adjust timeout values, increase resource limits, optimize cache settings
+
+#### 4. WebSocket Connection Problems
+**Symptoms**: Real-time data not updating
+**Solution**: Check WebSocket configuration, firewall rules, connection limits
+
+---
+
+## 🔄 Configuration Hot Reload
+
+Some configuration changes can be applied without restarting the application:
+
+### Hot-Reloadable Settings
+- Logging levels
+- Cache TTL values
+- Monitoring thresholds
+- Technical indicator parameters
+
+### Restart Required Settings
+- Database connection URL
+- API credentials
+- Network binding (HOST/PORT)
+- Security settings
+
 ```bash
-# Check database URL format
-echo $DATABASE_URL
-
-# Test database connectivity
-python -c "from src.backend.database.connection import test_connection; test_connection()"
+# Reload configuration without restart (for supported settings)
+curl -X POST http://localhost:8000/api/config/reload
 ```
 
-#### API Authentication Issues
-```bash
-# Verify Schwab API credentials
-python -c "from src.backend.integrations.schwab_client import test_auth; test_auth()"
+---
 
-# Check Google Cloud credentials
-gcloud auth application-default print-access-token
+## 🎯 Performance Tuning Recommendations
+
+### For Development
+```env
+DEBUG=true
+LOG_LEVEL=DEBUG
+TRADEASSIST_CACHE_MARKET_DATA_TTL=30
+TRADEASSIST_API_REQUEST_TIMEOUT_SECONDS=60.0
 ```
 
-#### WebSocket Configuration Issues
-```bash
-# Test WebSocket connectivity
-wscat -c ws://localhost:8000/ws
-
-# Check port availability
-netstat -ln | grep :8000
+### For Production
+```env
+DEBUG=false
+LOG_LEVEL=INFO
+TRADEASSIST_CACHE_MARKET_DATA_TTL=60
+TRADEASSIST_API_REQUEST_TIMEOUT_SECONDS=30.0
+TRADEASSIST_MONITORING_ENABLE_PERFORMANCE_TRACKING=true
 ```
 
-#### Performance Configuration Issues
-```bash
-# Monitor alert processing latency
-tail -f logs/tradeassist.log | grep "Alert processed"
-
-# Check memory usage
-ps aux | grep python
-
-# Monitor CPU usage
-top -p $(pgrep -f "main.py")
+### For High-Frequency Trading
+```env
+ALERT_EVALUATION_INTERVAL_MS=50
+DATA_INGESTION_BATCH_SIZE=200
+TRADEASSIST_CACHE_MARKET_DATA_TTL=30
+MAX_WEBSOCKET_CONNECTIONS=20
 ```
 
-### Configuration Validation Tools
+---
 
-```python
-# Automated configuration validation
-def validate_all_config():
-    """Comprehensive configuration validation"""
-    validators = [
-        validate_database_config,
-        validate_api_config,
-        validate_security_config,
-        validate_performance_config,
-        validate_notification_config
-    ]
+## 📊 Configuration Templates
 
-    for validator in validators:
-        try:
-            validator()
-            print(f"✅ {validator.__name__} passed")
-        except Exception as e:
-            print(f"❌ {validator.__name__} failed: {e}")
+### Minimal Configuration (.env)
+```env
+# Required settings only
+SCHWAB_CLIENT_ID=your_client_id
+SCHWAB_CLIENT_SECRET=your_client_secret
 ```
 
-This configuration guide ensures your TradeAssist system is properly configured for optimal performance, security, and reliability across all environments.
+### Complete Development Configuration
+```env
+# Development optimized
+HOST=127.0.0.1
+PORT=8000
+DEBUG=true
+LOG_LEVEL=DEBUG
+DATABASE_URL=sqlite+aiosqlite:///./data/trade_assist.db
+SCHWAB_CLIENT_ID=your_client_id
+SCHWAB_CLIENT_SECRET=your_client_secret
+SOUND_ALERTS_ENABLED=true
+ML_MODELS_ENABLED=true
+TRADEASSIST_MONITORING_ENABLE_PERFORMANCE_TRACKING=true
+```
+
+### Production Configuration
+```env
+# Production optimized
+HOST=0.0.0.0
+PORT=8000
+DEBUG=false
+LOG_LEVEL=INFO
+DATABASE_URL=sqlite+aiosqlite:///./data/trade_assist.db
+SCHWAB_CLIENT_ID=your_client_id
+SCHWAB_CLIENT_SECRET=your_client_secret
+GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
+SLACK_BOT_TOKEN=your_slack_token
+SLACK_CHANNEL=#trading-alerts
+TRADEASSIST_MONITORING_ENABLE_PERFORMANCE_TRACKING=true
+TRADEASSIST_MONITORING_ENABLE_ALERTING=true
+```
+
+---
+
+## 🆘 Configuration Support
+
+### Getting Help
+- **API Documentation**: `/docs` endpoint for live configuration API
+- **Configuration Validation**: `/api/config/validate` endpoint
+- **Health Check**: `/api/health` includes configuration status
+- **Logs**: Check application logs for configuration warnings
+
+### Best Practices
+1. **Start with minimal configuration** and add features incrementally
+2. **Test configuration changes** in development before production
+3. **Monitor performance metrics** after configuration changes
+4. **Keep sensitive credentials** in secure credential managers
+5. **Document custom configurations** for team collaboration
+
+---
+
+**🎯 Your TradeAssist system is now fully configured for professional trading!**
+
+For deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md). For usage information, see [USER_GUIDE.md](USER_GUIDE.md).

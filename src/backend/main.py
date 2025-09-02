@@ -158,8 +158,8 @@ def create_app() -> FastAPI:
     app.include_router(rules_router, prefix="/api", tags=["rules"])
     app.include_router(alerts_router, prefix="/api", tags=["alerts"])
     app.include_router(analytics_router, tags=["analytics"])
-    app.include_router(auth_router, prefix="/api", tags=["authentication"])
-    app.include_router(historical_data_router, tags=["historical-data"])
+    app.include_router(auth_router, tags=["authentication"])
+    app.include_router(historical_data_router, prefix="/api/historical-data", tags=["historical-data"])
     
     # Include WebSocket router
     app.include_router(websocket_router, prefix="/ws")

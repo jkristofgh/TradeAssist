@@ -359,22 +359,22 @@ export class ApiClient {
   // =============================================================================
 
   async initiateOAuth(): Promise<{
-    authorization_url: string;
+    authorizationUrl: string;
     state: string;
-    expires_at: string;
-    demo_mode: boolean;
+    expiresAt: string;
+    demoMode: boolean;
   }> {
     return this.post('/api/auth/oauth/initiate');
   }
 
   async completeOAuth(code: string, state: string): Promise<{
-    access_token: string;
-    refresh_token: string;
-    token_type: string;
-    expires_in: number;
+    accessToken: string;
+    refreshToken: string;
+    tokenType: string;
+    expiresIn: number;
     scope: string;
-    user_info: any;
-    demo_mode: boolean;
+    userInfo: any;
+    demoMode: boolean;
   }> {
     return this.post('/api/auth/oauth/complete', {
       code,
@@ -383,13 +383,13 @@ export class ApiClient {
   }
 
   async refreshToken(refreshToken?: string): Promise<{
-    access_token: string;
-    refresh_token: string;
-    token_type: string;
-    expires_in: number;
+    accessToken: string;
+    refreshToken: string;
+    tokenType: string;
+    expiresIn: number;
     scope: string;
-    user_info: any;
-    demo_mode: boolean;
+    userInfo: any;
+    demoMode: boolean;
   }> {
     // If no refresh token provided, try to get it from storage
     const tokenToUse = refreshToken || sessionStorage.getItem('refresh_token');
@@ -404,11 +404,11 @@ export class ApiClient {
   }
 
   async getAuthStatus(): Promise<{
-    is_authenticated: boolean;
-    user_info?: any;
-    token_expires_at?: string;
-    demo_mode: boolean;
-    connection_status: string;
+    isAuthenticated: boolean;
+    userInfo?: any;
+    tokenExpiresAt?: string;
+    demoMode: boolean;
+    connectionStatus: string;
   }> {
     return this.get('/api/auth/status');
   }

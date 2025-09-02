@@ -224,7 +224,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Initiate OAuth flow
       const response = await apiClient.initiateOAuth();
       
-      if (response.demo_mode) {
+      if (response.demoMode) {
         // Handle demo mode authentication
         console.log('Demo mode authentication initiated');
         dispatch({
@@ -247,7 +247,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Redirect to Schwab OAuth page
       console.log('Redirecting to Schwab OAuth page');
-      window.location.href = response.authorization_url;
+      window.location.href = response.authorizationUrl;
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Login failed';
@@ -267,19 +267,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await apiClient.completeOAuth(code, state);
       
       // Store tokens securely
-      if (!response.demo_mode) {
-        storeTokens(response.access_token, response.refresh_token || '');
+      if (!response.demoMode) {
+        storeTokens(response.accessToken, response.refreshToken || '');
       }
       
       // Update auth state
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: {
-          user: response.user_info,
-          accessToken: response.access_token,
-          refreshToken: response.refresh_token || '',
-          expiresIn: response.expires_in,
-          demoMode: response.demo_mode
+          user: response.userInfo,
+          accessToken: response.accessToken,
+          refreshToken: response.refreshToken || '',
+          expiresIn: response.expiresIn,
+          demoMode: response.demoMode
         },
       });
       
@@ -319,14 +319,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await apiClient.refreshToken(refreshToken);
       
       // Store new tokens
-      storeTokens(response.access_token, response.refresh_token || refreshToken);
+      storeTokens(response.accessToken, response.refreshToken || refreshToken);
       
       // Update auth state
       dispatch({
         type: 'TOKEN_REFRESH',
         payload: {
-          accessToken: response.access_token,
-          expiresIn: response.expires_in,
+          accessToken: response.accessToken,
+          expiresIn: response.expiresIn,
         },
       });
       
@@ -374,23 +374,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Checking authentication status');
       const status = await apiClient.getAuthStatus();
       
-      dispatch({ type: 'SET_CONNECTION_STATUS', payload: status.connection_status });
+      dispatch({ type: 'SET_CONNECTION_STATUS', payload: status.connectionStatus });
       
-      if (status.demo_mode) {
+      if (status.demoMode) {
         dispatch({ type: 'SET_DEMO_MODE', payload: true });
       }
       
-      if (status.is_authenticated && status.user_info) {
+      if (status.isAuthenticated && status.userInfo) {
         // Restore authentication state
         dispatch({
           type: 'AUTH_SUCCESS',
           payload: {
-            user: status.user_info,
+            user: status.userInfo,
             accessToken: getStoredTokens().accessToken || 'demo_token',
             refreshToken: getStoredTokens().refreshToken || 'demo_refresh_token',
-            expiresIn: status.token_expires_at ? 
-              Math.max(0, (new Date(status.token_expires_at).getTime() - Date.now()) / 1000) : 3600,
-            demoMode: status.demo_mode
+            expiresIn: status.tokenExpiresAt ? 
+              Math.max(0, (new Date(status.tokenExpiresAt).getTime() - Date.now()) / 1000) : 3600,
+            demoMode: status.demoMode
           }
         });
       }

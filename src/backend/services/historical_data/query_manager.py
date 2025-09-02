@@ -10,7 +10,7 @@ import re
 import structlog
 from collections import defaultdict
 from dataclasses import dataclass, asdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any, Set
 
 from sqlalchemy import select, and_, func
@@ -55,7 +55,7 @@ class HistoricalDataQueryManager:
     """
     
     def __init__(self):
-        self._query_patterns: Dict[str, int] = {}
+        self._query_patterns: Dict[str, int] = defaultdict(int)
         self._performance_stats: Dict[str, List[float]] = defaultdict(list)
         self._validation_rules = self._initialize_validation_rules()
         self._validation_failures = 0
@@ -468,10 +468,21 @@ class HistoricalDataQueryManager:
         
         # Validate date range
         if normalized_request.start_date and normalized_request.end_date:
-            if normalized_request.start_date >= normalized_request.end_date:
+            # Ensure both dates are timezone-aware before comparison
+            start_date = normalized_request.start_date
+            end_date = normalized_request.end_date
+            
+            if start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=timezone.utc)
+                normalized_request.start_date = start_date
+            if end_date.tzinfo is None:
+                end_date = end_date.replace(tzinfo=timezone.utc)
+                normalized_request.end_date = end_date
+                
+            if start_date >= end_date:
                 errors.append("Start date must be before end date")
             else:
-                date_range_days = (normalized_request.end_date - normalized_request.start_date).days
+                date_range_days = (end_date - start_date).days
                 
                 if date_range_days > self._validation_rules["max_date_range_days"]:
                     errors.append(
@@ -482,12 +493,20 @@ class HistoricalDataQueryManager:
                     warnings.append(f"Very small date range: {date_range_days} days")
         
         # Validate future dates
-        now = datetime.utcnow()
-        if normalized_request.start_date and normalized_request.start_date > now:
-            errors.append("Start date cannot be in the future")
-        if normalized_request.end_date and normalized_request.end_date > now:
-            warnings.append("End date is in the future, will be limited to current time")
-            normalized_request.end_date = now
+        now = datetime.now(timezone.utc)
+        if normalized_request.start_date:
+            # Make start_date timezone-aware if it's naive
+            if normalized_request.start_date.tzinfo is None:
+                normalized_request.start_date = normalized_request.start_date.replace(tzinfo=timezone.utc)
+            if normalized_request.start_date > now:
+                errors.append("Start date cannot be in the future")
+        if normalized_request.end_date:
+            # Make end_date timezone-aware if it's naive
+            if normalized_request.end_date.tzinfo is None:
+                normalized_request.end_date = normalized_request.end_date.replace(tzinfo=timezone.utc)
+            if normalized_request.end_date > now:
+                warnings.append("End date is in the future, will be limited to current time")
+                normalized_request.end_date = now
         
         # Validate max_records
         if normalized_request.max_records is not None:

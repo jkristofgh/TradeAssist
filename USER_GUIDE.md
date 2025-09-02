@@ -2,15 +2,16 @@
 
 ## 🎯 Getting Started
 
-TradeAssist is your real-time trading alerts system with sub-second latency. This guide covers all current features and functionality.
+TradeAssist is your professional real-time trading alerts system with sub-second latency and advanced analytics. This comprehensive guide covers all features and functionality available in the current version.
 
 ### First Time Setup
 
-1. **Access the Dashboard**: Open http://localhost:8000 in your browser
+1. **Access the Dashboard**: Open http://localhost:3000 (development) or http://localhost:8000 (production) in your browser
 2. **System Health Check**: Verify all systems are green in the Health panel
-3. **Add Instruments**: Add the trading instruments you want to monitor
-4. **Create Alert Rules**: Define your first alert conditions
-5. **Configure Notifications**: Set up your preferred alert channels
+3. **Review Instruments**: Check the 12 monitored instruments are streaming data
+4. **Create Alert Rules**: Define your first alert conditions based on technical indicators
+5. **Configure Notifications**: Set up your preferred alert channels (in-app, sound, Slack)
+6. **Explore Analytics**: Review the advanced analytics features and market insights
 
 ---
 
@@ -19,28 +20,34 @@ TradeAssist is your real-time trading alerts system with sub-second latency. Thi
 ### Main Dashboard Components
 
 #### Real-Time Status Panel
-- **Connection Status**: API and WebSocket connectivity indicators  
-- **System Health**: Database, services, and overall system status
-- **Alert Processing**: Live alert count and processing metrics
-- **Market Status**: Current market session information
+- **Connection Status**: Schwab API and WebSocket connectivity indicators  
+- **System Health**: Database, services, and overall system status with performance metrics
+- **Alert Processing**: Live alert count, processing metrics, and latency monitoring
+- **Market Status**: Current market session information and data freshness
+- **Performance Indicators**: Circuit breaker status, error rates, and system uptime
 
 #### Instrument Watchlist
-- **Live Prices**: Real-time streaming market data
-- **Price Changes**: Visual indicators for price movements
-- **Quick Actions**: Add/remove instruments from monitoring
-- **Sorting**: Organize instruments by symbol, price, or change
+- **Live Prices**: Real-time streaming market data for 12 instruments
+- **Price Changes**: Visual indicators with color-coded price movements and percentage changes
+- **Volume Data**: Current volume and volume-weighted average prices
+- **Quick Actions**: Add/remove instruments from active monitoring
+- **Technical Overlays**: Quick view of key technical indicators (RSI, MACD, etc.)
+- **Sorting Options**: Organize by symbol, price, change, volume, or custom criteria
 
 #### Alert History
-- **Recent Alerts**: Chronological list of triggered alerts
-- **Alert Details**: Timestamps, conditions, and triggered values
-- **Filtering**: Search and filter alerts by instrument or type
-- **Export**: Download alert history for analysis
+- **Recent Alerts**: Chronological list of triggered alerts with timestamps
+- **Alert Details**: Condition details, triggered values, and notification status
+- **Filtering & Search**: Search by instrument, alert type, time range, or custom conditions  
+- **Export Options**: Download alert history in CSV or JSON format
+- **Performance Metrics**: Alert processing times and delivery confirmation
 
 #### Historical Data Access
-- **Quick Access**: Instant historical data queries
-- **Chart Integration**: Visual data analysis capabilities
-- **Query Management**: Save and reuse common data requests
-- **Export Options**: CSV and JSON data export
+- **Quick Queries**: Instant historical data retrieval with predefined time ranges
+- **Custom Queries**: Flexible query builder for specific data requirements
+- **Chart Integration**: Interactive charts with technical analysis overlays
+- **Query Management**: Save, edit, and reuse frequent data queries
+- **Export Capabilities**: Multiple format support (CSV, JSON, Excel)
+- **Data Validation**: Built-in integrity checks and quality indicators
 
 ---
 
@@ -48,559 +55,346 @@ TradeAssist is your real-time trading alerts system with sub-second latency. Thi
 
 ### Current Supported Instruments
 
-Based on the configuration, TradeAssist currently supports:
+**Futures**
+- **ES** - E-mini S&P 500 Future
+- **NQ** - E-mini NASDAQ-100 Future  
+- **YM** - E-mini Dow Future
+- **CL** - Crude Oil Future
+- **GC** - Gold Future
 
-#### Futures Contracts
-- **ES** - E-mini S&P 500
-- **NQ** - E-mini NASDAQ-100
-- **YM** - E-mini Dow Jones
-- **CL** - Crude Oil
-- **GC** - Gold
-
-#### Major Indices
+**Indices**
 - **SPX** - S&P 500 Index
-- **NDX** - NASDAQ-100 Index  
+- **NDX** - NASDAQ-100 Index
 - **RUT** - Russell 2000 Index
 
-#### Market Internals
-- **VIX** - Volatility Index
-- **TICK** - NYSE Tick Index
-- **ADD** - NYSE Advance-Decline
-- **TRIN** - Arms Index
+**Market Internals**
+- **VIX** - Volatility Index (Fear Index)
+- **TICK** - NYSE TICK Index
+- **ADD** - NYSE Advance/Decline Line  
+- **TRIN** - Arms Index (Trading Index)
 
-### Adding Instruments to Monitor
-
-1. Navigate to the **Dashboard**
-2. Use the **Instrument Watchlist** component
-3. Add instruments using the interface
-4. Configure which instruments to monitor in your `.env` file:
-   ```env
-   TARGET_FUTURES=ES,NQ,YM,CL,GC
-   TARGET_INDICES=SPX,NDX,RUT
-   TARGET_INTERNALS=VIX,TICK,ADD,TRIN
-   ```
-
-### Watchlist Features
-- **Real-time Updates**: Live price streaming
-- **Visual Indicators**: Color-coded price changes
-- **Quick Access**: Easy instrument selection for alerts
-- **Performance Optimized**: Efficient data handling
+### Data Specifications
+- **Update Frequency**: Sub-second real-time streaming
+- **Data Points**: OHLCV (Open, High, Low, Close, Volume) plus extended market data
+- **Latency Target**: <500ms from market to alert notification
+- **Historical Depth**: Configurable retention (default 30 days)
+- **Quality Assurance**: Automatic data validation and integrity checks
 
 ---
 
-## 🚨 Alert System
+## 🔔 Alert System
 
-### Current Alert Management
+### Alert Rule Creation
 
-#### Rule Management Interface
-1. Navigate to **Rules** section in the dashboard
-2. View existing alert rules
-3. Create, edit, or delete rules
-4. Enable/disable rules as needed
+#### Supported Alert Types
 
-#### Alert Rule Configuration
-The system supports configurable alert rules with:
-- **Instrument Selection**: Choose from monitored instruments
-- **Condition Settings**: Define trigger conditions
-- **Message Customization**: Personalize alert messages
-- **Channel Selection**: Choose notification methods
+**Technical Indicator Alerts**
+- **RSI (Relative Strength Index)**: Overbought/oversold conditions
+- **MACD**: Moving Average Convergence Divergence crossovers and divergence
+- **Bollinger Bands**: Price breakouts above/below bands
+- **Moving Averages**: Simple and exponential MA crossovers
+- **Stochastic**: Momentum oscillator signals
+- **ATR (Average True Range)**: Volatility-based alerts
 
-#### Alert History Tracking
-- **Chronological Display**: View alerts in time order
-- **Detailed Information**: See trigger conditions and values
-- **Filtering Options**: Search by instrument, time, or condition
-- **Performance Metrics**: Track alert frequency and patterns
+**Price-Based Alerts**
+- **Price Targets**: Above/below specific price levels
+- **Percentage Changes**: Price movement thresholds
+- **Volume Alerts**: Unusual volume activity
+- **Price Patterns**: Support/resistance level breaches
 
-### Alert Rule Types
+**Advanced Analytics Alerts**
+- **ML Predictions**: Machine learning-based price forecasts
+- **Anomaly Detection**: Unusual market behavior identification
+- **Risk Metrics**: Value-at-Risk threshold breaches
+- **Market Microstructure**: Order flow and market depth changes
 
-#### 1. Price-Based Rules
-- **Threshold Alerts**: Price above/below specific levels
-- **Percentage Change**: Price moved X% from reference
-- **Support/Resistance**: Price approaching key levels
-- **Gap Alerts**: Opening gaps above threshold
+#### Alert Configuration Options
+- **Frequency**: One-time, repeated, or time-based alerts
+- **Conditions**: Multiple condition combinations with AND/OR logic
+- **Timeframes**: 1m, 5m, 15m, 30m, 1h, 4h, 1d timeframes
+- **Sensitivity**: Configurable threshold values
+- **Filters**: Market hours, volatility filters, volume filters
 
-#### 2. Technical Indicator Rules
-- **RSI Alerts**: Overbought (>70) or oversold (<30) conditions
-- **Moving Average**: Price crossing above/below MA
-- **MACD Signals**: Bullish/bearish crossovers
-- **Bollinger Bands**: Price touching upper/lower bands
-- **Volume Indicators**: Above/below average volume
-
-#### 3. Market Condition Rules
-- **Volatility Alerts**: VIX above/below thresholds
-- **Market Breadth**: Advance/decline ratios
-- **Sector Rotation**: Relative strength changes
-- **Market Sentiment**: Fear/greed indicators
-
-#### 4. Risk Management Rules
-- **Position Limits**: Maximum exposure warnings
-- **Correlation Alerts**: High correlation between positions
-- **Drawdown Warnings**: Portfolio decline thresholds
-- **Margin Alerts**: Margin usage warnings
-
-### Current Alert Channels
+### Notification Channels
 
 #### In-App Notifications
-- **Dashboard Alerts**: Real-time notifications within the web interface
-- **Toast Notifications**: Pop-up alerts using React Toastify
-- **Alert History**: Comprehensive logging of all triggered alerts
-- **Visual Indicators**: Real-time status updates in the UI
+- **Real-time Popups**: Instant visual alerts with alert details
+- **Alert Queue**: Persistent notification list with acknowledgment
+- **Priority Levels**: Critical, high, medium, low priority classification
+- **Custom Sounds**: Configurable alert tones per alert type
 
-#### Slack Integration (Configurable)
-Configure in your `.env` file:
-```env
-SLACK_BOT_TOKEN=xoxb-your-slack-bot-token-here
-SLACK_CHANNEL=#trading-alerts
-```
+#### Sound Notifications  
+- **System Integration**: Pygame-based audio alerts
+- **Custom Audio Files**: Upload your own alert sounds
+- **Volume Control**: Adjustable volume levels
+- **Sound Profiles**: Different sounds for different alert types
 
-#### Sound Alerts (Configurable) 
-Enable in your `.env` file:
-```env
-SOUND_ALERTS_ENABLED=true
-```
-- **Browser-based**: Sound alerts play through the web interface
-- **Customizable**: Configure different sounds for different alert types
-
-### Managing Active Alerts
-
-#### Alert History
-- **View all alerts** with timestamps and details
-- **Filter by instrument**, type, or date range
-- **Export alerts** to CSV for analysis
-- **Alert performance** tracking
-
-#### Alert Rules Management
-- **Enable/Disable rules** without deleting
-- **Edit existing rules** with live preview
-- **Duplicate rules** for similar setups
-- **Rule templates** for common patterns
+#### Slack Integration
+- **Channel Notifications**: Direct alerts to specified Slack channels
+- **Rich Formatting**: Detailed alert information with charts
+- **Bot Integration**: Dedicated TradeAssist bot with interactive features
+- **Threading**: Organized alert discussions and follow-ups
 
 ---
 
-## 📊 Historical Data Analysis
+## 📈 Advanced Analytics Engine
 
-TradeAssist provides comprehensive historical market data access with advanced querying capabilities and export functionality.
+### Technical Analysis
 
-### Historical Data Page
+#### Available Indicators
+- **Trend Indicators**: Moving Averages (SMA, EMA, WMA), MACD, ADX
+- **Momentum Oscillators**: RSI, Stochastic, Williams %R, CCI
+- **Volatility Indicators**: Bollinger Bands, ATR, Volatility Bands
+- **Volume Indicators**: Volume SMA, VWAP, On-Balance Volume
+- **Support/Resistance**: Pivot Points, Fibonacci Retracements
 
-Access historical data through the **Historical Data** navigation link. The page features two main tabs:
+#### Custom Indicator Configuration  
+- **Parameter Adjustment**: Customize periods, smoothing factors
+- **Multi-timeframe Analysis**: Same indicator across different timeframes
+- **Combination Strategies**: Multiple indicator confirmation systems
+- **Backtesting**: Historical performance validation
 
-#### New Query Tab
-Create and execute new historical data queries with full parameter control:
+### Machine Learning Features
 
-**Symbol Selection**
-- **Multiple Symbols**: Query multiple instruments simultaneously (e.g., AAPL, SPY, /ES)
-- **Asset Classes**: Support for stocks, indices, and futures contracts
-- **Symbol Validation**: Real-time validation of symbol formats
+#### Price Prediction Models
+- **Short-term Forecasts**: 15-minute to 4-hour predictions
+- **Confidence Intervals**: Prediction accuracy and reliability scores
+- **Model Selection**: Multiple ML algorithms (LSTM, Random Forest, SVM)
+- **Feature Engineering**: Technical indicators, market sentiment, volatility
 
-**Time Range Configuration**
-- **Preset Ranges**: Today, Yesterday, Last 7/30/90 days, Last Year
-- **Custom Ranges**: Specify exact start and end dates/times
-- **Extended Hours**: Include pre-market and after-hours trading data
+#### Market Analysis
+- **Trend Classification**: Bull/bear/sideways market identification
+- **Regime Detection**: Market volatility regime changes
+- **Correlation Analysis**: Cross-instrument relationship analysis
+- **Sector Analysis**: Sector rotation and strength analysis
 
-**Data Frequency Options**
-- **Intraday**: 1min, 5min, 15min, 30min, 1h, 4h intervals
-- **Daily/Weekly/Monthly**: 1d, 1w, 1M aggregation
-- **Volume Control**: Limit maximum records (1-10,000)
+#### Risk Management
+- **Value-at-Risk (VaR)**: Portfolio risk calculations
+- **Stress Testing**: Scenario analysis for extreme market conditions
+- **Maximum Drawdown**: Risk assessment metrics
+- **Position Sizing**: Optimal position size recommendations
 
-**Futures-Specific Features**
-- **Continuous Series**: Automatic contract rolling for uninterrupted historical series
-- **Roll Policies**: Calendar, Volume, or Open Interest-based roll timing
-- **Contract Months**: Access to specific futures contract expiration months
+### Volume Profile Analysis
+- **Volume Distribution**: Price level volume analysis
+- **Point of Control (POC)**: High-volume price levels
+- **Value Area**: 70% volume concentration zones  
+- **Volume Imbalances**: Market inefficiencies identification
 
-#### Saved Queries Tab
-Manage and reuse frequently accessed data queries:
+---
 
-**Query Management**
-- **Save Queries**: Store queries with custom names and descriptions
-- **Favorites System**: Mark frequently used queries for quick access
-- **Search & Filter**: Find queries by name, description, or symbols
-- **Execution Tracking**: View query run history and frequency
+## 📊 Historical Data Management
 
-**Organization Features**
-- **Sort Options**: By creation date, name, last executed, or favorites
-- **Bulk Operations**: Edit, delete, or execute multiple queries
-- **Query Sharing**: Export query definitions for team collaboration
+### Data Query Interface
 
-### Data Preview & Analysis
+#### Query Builder
+- **Time Range Selection**: Flexible date/time range picker
+- **Instrument Selection**: Single or multiple instrument queries
+- **Data Granularity**: Choose from tick, 1m, 5m, 15m, 1h, 4h, 1d data
+- **Field Selection**: OHLCV plus extended market data fields
+- **Aggregation Options**: Sum, average, min, max, custom calculations
 
-#### Table View
-Comprehensive data display with full control:
+#### Saved Queries
+- **Query Templates**: Save frequently used query configurations
+- **Scheduled Queries**: Automatic query execution at specified intervals
+- **Query Sharing**: Export/import query configurations
+- **Query History**: Track and replay previous queries
 
-**Data Display**
-- **OHLCV Data**: Open, High, Low, Close, Volume for each time period
-- **Additional Metrics**: VWAP, Trade Count, Open Interest (futures)
-- **Quality Scoring**: Data quality indicators and completeness metrics
-- **Sorting**: Click column headers to sort by any data field
-
-**Navigation & Pagination**
-- **Page Size Control**: 10, 25, 50, or 100 records per page
-- **Quick Navigation**: First, Previous, Next, Last page controls
-- **Record Counts**: Total records and current page information
-
-#### Chart View
-Visual data analysis capabilities:
-
-**Chart Types**
-- **Candlestick Charts**: Traditional OHLC visualization
-- **Line Charts**: Simple price movement tracking
-- **Multi-Symbol Charts**: Compare multiple instruments simultaneously
-- **Volume Overlays**: Volume bars with price charts
-
-**Interactive Features**
-- **Zoom & Pan**: Navigate through historical periods
-- **Crosshair**: Precise data point examination
-- **Time Period Selection**: Dynamic chart period adjustment
-
-### Data Export & Sharing
+### Data Export & Integration
 
 #### Export Formats
-- **CSV Export**: Spreadsheet-compatible comma-separated values
-- **JSON Export**: Structured data for programmatic analysis
-- **Custom Formatting**: Date/time formatting options
+- **CSV**: Comma-separated values for Excel/analysis tools
+- **JSON**: Structured data for programmatic access
+- **Excel**: Native Excel format with formatting
+- **Python Pandas**: Direct DataFrame export for analysis
 
-#### Export Features
-- **Selective Export**: Choose specific data fields and date ranges
-- **Batch Export**: Export multiple queries simultaneously
-- **File Naming**: Automatic timestamp and symbol-based file naming
-
-### Query Execution & Performance
-
-#### Execution Options
-- **Immediate Execution**: Run queries instantly with form submission
-- **Rerun Capabilities**: Re-execute queries with modified parameters
-- **Background Processing**: Large queries processed asynchronously
-
-#### Performance Features
-- **Caching System**: 15-minute cache for frequently accessed data
-- **Cache Indicators**: Visual feedback when data served from cache
-- **Response Times**: Query execution time display
-- **Rate Limiting**: Automatic throttling to prevent API overload
-
-#### Error Handling
-- **Validation Messages**: Clear error messages for invalid parameters
-- **Connection Status**: Real-time API connectivity indicators
-- **Retry Logic**: Automatic retry for transient failures
-- **Fallback Data**: Demo data when live services unavailable
-
-### Integration Features
-
-#### Real-Time Connection
-- **WebSocket Status**: Live connection indicator
-- **Service Health**: Historical data service status monitoring
-- **Auto-Reconnection**: Automatic reconnection on connection loss
-
-#### API Integration
-- **Rate Limits**: Respectful API usage with built-in throttling
-- **Service Discovery**: Automatic detection of available data sources
-- **Provider Information**: Data source capabilities and limitations
+#### API Access
+- **REST Endpoints**: Programmatic data access
+- **Authentication**: Secure API key management
+- **Rate Limiting**: Fair usage policies
+- **Documentation**: Interactive API documentation at `/docs`
 
 ---
 
-## 📈 Advanced Analytics
+## ⚙️ System Administration
 
-### Market Analytics Dashboard
+### Health Monitoring
 
-#### Technical Indicators
-- **Moving Averages**: SMA, EMA, WMA with customizable periods
-- **Oscillators**: RSI, Stochastic, Williams %R
-- **Momentum**: MACD, Rate of Change, ADX
-- **Volatility**: Bollinger Bands, ATR, Volatility Index
+#### System Health Dashboard
+- **Service Status**: Real-time status of all system components
+- **Performance Metrics**: CPU, memory, disk usage, network activity
+- **Database Health**: Connection status, query performance, data integrity
+- **API Connectivity**: External API status and response times
+- **Error Rates**: System error monitoring and alerting
 
-#### Volume Analysis
-- **Volume Profile**: Price-volume distribution
-- **Volume Weighted Average Price (VWAP)**
-- **On-Balance Volume (OBV)**
-- **Volume Rate of Change**
+#### Performance Monitoring
+- **Alert Latency**: Real-time alert processing time monitoring
+- **WebSocket Performance**: Connection stability and message delivery
+- **Database Performance**: Query optimization and index usage
+- **Memory Management**: Memory usage and garbage collection monitoring
 
-#### Market Sentiment
-- **VIX Analysis**: Fear and greed indicators
-- **Put/Call Ratios**: Market sentiment metrics
-- **Advance/Decline**: Market breadth indicators
-- **High/Low Index**: Market strength analysis
+### Configuration Management
 
-### Risk Analysis Tools
+#### System Settings
+- **Performance Tuning**: Alert processing, database, WebSocket configuration
+- **Logging Levels**: Adjustable logging detail and retention
+- **Security Settings**: Authentication, API access, encryption
+- **Notification Settings**: Channel configuration and delivery preferences
 
-#### Portfolio Risk Metrics
-- **Value at Risk (VaR)**: Portfolio risk estimation
-- **Beta Analysis**: Market correlation
-- **Sharpe Ratio**: Risk-adjusted returns
-- **Maximum Drawdown**: Worst-case scenarios
-
-#### Correlation Analysis
-- **Inter-instrument correlations**
-- **Sector correlation heatmaps**
-- **Rolling correlation analysis**
-- **Correlation breakdown alerts**
-
-### Predictive Models
-
-#### Machine Learning Features
-- **Price Prediction Models**: Short-term price forecasting
-- **Volatility Forecasting**: Expected volatility ranges
-- **Trend Analysis**: Trend strength and direction
-- **Pattern Recognition**: Automated chart pattern detection
-
-#### Model Performance
-- **Prediction accuracy** tracking
-- **Model confidence** indicators
-- **Historical performance** analysis
-- **Model retraining** schedules
+#### Advanced Configuration
+- **Circuit Breakers**: Automatic failover and recovery settings  
+- **Rate Limiting**: API request throttling and fair usage
+- **Caching Strategy**: Data caching and invalidation policies
+- **Database Optimization**: Index management and query optimization
 
 ---
 
-## ⚡ Real-Time Features
+## 🔒 Security & Authentication
 
-### WebSocket Data Streaming
+### Schwab API Integration
+- **OAuth 2.0 Flow**: Secure authentication with Schwab
+- **Token Management**: Automatic token refresh and secure storage
+- **API Permissions**: Granular access control and monitoring
+- **Security Compliance**: Industry-standard security practices
 
-#### Live Data Updates
-- **Sub-second latency** for market data
-- **Real-time alert delivery**
-- **Live system status updates**
-- **Streaming chart updates**
+### Data Security
+- **Encryption**: Data at rest and in transit encryption
+- **Access Control**: Role-based access and permissions
+- **Audit Logging**: Comprehensive activity logging
+- **Secure Storage**: Google Cloud Secret Manager integration
 
-#### Connection Management
-- **Automatic reconnection** on connection loss
-- **Connection status indicators**
-- **Data quality monitoring**
-- **Failover mechanisms**
-
-### Performance Optimization
-
-#### Alert Processing
-- **Target latency**: <500ms from data to alert
-- **Concurrent processing**: Multiple alerts simultaneously
-- **Queue management**: Prioritized alert processing
-- **Performance monitoring**: Real-time latency tracking
-
-#### Data Efficiency
-- **Selective subscriptions**: Only requested instruments
-- **Data compression**: Optimized data transmission
-- **Caching strategies**: Frequently accessed data
-- **Memory management**: Efficient resource usage
+### Privacy Protection
+- **Data Retention**: Configurable data retention policies
+- **Data Anonymization**: Personal information protection
+- **Compliance**: Financial data handling compliance
+- **Backup Security**: Encrypted backup storage
 
 ---
 
-## 🔧 System Configuration
+## 🛠️ Troubleshooting & Support
 
-### Notification Settings
+### Common Issues & Solutions
 
-#### Global Settings
-```
-Sound Enabled: Yes
-Default Volume: 80%
-Quiet Hours: 6 PM - 6 AM
-Max Alerts per Minute: 10
-```
+#### Connection Problems
+- **Schwab API Issues**: Check credentials, token validity, API status
+- **WebSocket Disconnections**: Automatic reconnection with exponential backoff
+- **Network Issues**: Network diagnostics and fallback mechanisms
+- **Database Connectivity**: Connection pooling and retry logic
 
-#### Channel-Specific Settings
-```
-In-App Notifications:
-  - Show popups: Yes
-  - Auto-dismiss time: 10 seconds
-  - Max visible alerts: 5
+#### Performance Issues  
+- **High Latency**: Performance monitoring and optimization tools
+- **Memory Usage**: Memory profiling and optimization recommendations
+- **Database Performance**: Query optimization and index analysis
+- **Frontend Responsiveness**: Browser performance and optimization
 
-Slack Notifications:
-  - Enabled: Yes
-  - Channel: #alerts
-  - Include charts: Yes
-  - Mention users: @trader
-
-Sound Notifications:
-  - Alert sound: alert.wav
-  - Volume: 80%
-  - Different sounds per type: Yes
-```
-
-### Performance Settings
-
-#### Alert Engine Configuration
-```
-Alert Latency Target: 500ms
-Max Concurrent Alerts: 50
-Alert Batch Size: 100
-Queue Size: 1000
-```
-
-#### Data Processing
-```
-Market Data Buffer: 1000 ticks
-Update Frequency: Real-time
-Chart Update Interval: 100ms
-History Retention: 30 days
-```
-
-### System Monitoring
-
-#### Health Checks
-- **Database connectivity**
-- **Schwab API status**
-- **WebSocket connections**
-- **Alert processing latency**
-- **Memory and CPU usage**
-
-#### Performance Metrics
-- **Alert processing times**
-- **API response latencies**
-- **WebSocket message rates**
-- **Database query performance**
-
----
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-#### No Real-Time Data
-**Symptoms**: Charts not updating, no price feeds
-**Solutions**:
-1. Check Schwab API connection in Health panel
-2. Verify API credentials in settings
-3. Check internet connectivity
-4. Restart the application
-
-#### Alerts Not Triggering
-**Symptoms**: Price conditions met but no alerts
-**Solutions**:
-1. Verify alert rules are enabled
-2. Check rule conditions and syntax
-3. Review notification channel settings
-4. Check alert history for processing errors
-
-#### High Alert Latency
-**Symptoms**: Alerts delayed >1 second
-**Solutions**:
-1. Check system resources (CPU, memory)
-2. Reduce number of active rules
-3. Optimize alert conditions
-4. Check network latency
-
-#### WebSocket Connection Issues
-**Symptoms**: Disconnection messages, no real-time updates
-**Solutions**:
-1. Check firewall settings
-2. Verify WebSocket port availability
-3. Review proxy/VPN settings
-4. Restart browser/application
+#### Data Issues
+- **Missing Data**: Data validation and gap detection
+- **Incorrect Data**: Data integrity checks and correction procedures
+- **Export Problems**: Format validation and error handling
+- **Historical Data**: Data backfill and consistency verification
 
 ### Getting Help
 
-#### Log Analysis
-```bash
-# Check application logs
-tail -f logs/tradeassist.log
+#### Built-in Diagnostics
+- **System Health**: Comprehensive health check tools
+- **Performance Analysis**: Built-in performance profiling
+- **Error Logging**: Detailed error reporting and tracking
+- **Debug Tools**: Advanced debugging and troubleshooting utilities
 
-# Filter for errors
-grep "ERROR" logs/tradeassist.log
-
-# Monitor alert processing
-grep "Alert processed" logs/tradeassist.log
-```
-
-#### System Diagnostics
-- **Health endpoint**: http://localhost:8000/api/health
-- **API documentation**: http://localhost:8000/docs
-- **WebSocket test**: Use browser developer tools
-
-#### Support Resources
-1. **System Health Dashboard**: Real-time system status
-2. **API Documentation**: Complete API reference
-3. **Log Files**: Detailed error tracking
-4. **Performance Metrics**: System performance analysis
+#### Documentation Resources
+- **API Documentation**: Interactive API explorer at `/docs`
+- **Configuration Guide**: Comprehensive configuration reference
+- **Deployment Guide**: Step-by-step deployment instructions
+- **Best Practices**: Recommended usage patterns and optimization tips
 
 ---
 
-## 📱 Mobile Access
+## 🚀 Advanced Features
 
-### Responsive Design
-- **Mobile-optimized dashboard**
-- **Touch-friendly controls**
-- **Responsive charts and data**
-- **Mobile notifications** (if configured)
+### Automation & Scripting
+- **Custom Alerts**: Advanced alert logic with custom scripting
+- **Automated Responses**: Trigger-based automated actions
+- **Data Processing**: Custom data transformation and analysis
+- **Integration APIs**: Connect with external trading platforms
 
-### Mobile Features
-- **Quick alert overview**
-- **Essential system status**
-- **Alert acknowledgment**
-- **Emergency stop/start controls**
+### Performance Optimization
+- **Real-time Tuning**: Dynamic performance optimization
+- **Resource Management**: Intelligent resource allocation
+- **Caching Strategy**: Advanced caching for optimal performance
+- **Load Balancing**: Distributed processing capabilities
 
----
-
-## 🔒 Security Best Practices
-
-### API Security
-- **Secure credential storage** in Google Cloud Secret Manager
-- **Token rotation** for Schwab API
-- **HTTPS enforcement** for all communications
-- **API rate limiting** protection
-
-### System Security
-- **Firewall configuration** for required ports only
-- **Regular security updates**
-- **Log monitoring** for suspicious activity
-- **Backup encryption** for sensitive data
+### Analytics Integration
+- **External Tools**: Integration with popular analysis platforms
+- **Custom Dashboards**: Personalized analytics dashboards
+- **Reporting**: Automated reporting and analysis
+- **Machine Learning**: Custom ML model integration
 
 ---
 
-## 🚀 Advanced Usage
+## 📋 Quick Reference
 
-### Custom Alert Logic
-```python
-# Example: Custom technical analysis alert
-def custom_rsi_divergence_alert(data):
-    """
-    Alert when price makes higher high but RSI makes lower high
-    """
-    price_trend = analyze_price_trend(data['price'])
-    rsi_trend = analyze_rsi_trend(data['rsi'])
-    
-    if price_trend == 'higher_high' and rsi_trend == 'lower_high':
-        return create_alert("RSI Bearish Divergence Detected")
-```
+### Keyboard Shortcuts
+- **Ctrl+R**: Refresh dashboard
+- **Ctrl+H**: Show/hide health panel
+- **Ctrl+A**: Show alert history
+- **Ctrl+D**: Open historical data interface
+- **Ctrl+S**: Open system settings
+- **Esc**: Close modals and popups
 
-### API Integration
-```javascript
-// Custom dashboard widgets
-const customWidget = {
-    fetchData: async () => {
-        const response = await fetch('/api/custom-metrics');
-        return response.json();
-    },
-    render: (data) => {
-        // Custom visualization logic
-    }
-};
-```
+### URL Shortcuts
+- `/docs` - API documentation
+- `/health` - System health check
+- `/api/instruments` - Instrument data
+- `/api/alerts` - Alert history
+- `/ws/realtime` - WebSocket endpoint
 
-### Automation Scripts
-```bash
-# Automated trading session management
-./scripts/market_open_setup.sh   # Run at market open
-./scripts/market_close_cleanup.sh # Run at market close
-```
+### Performance Targets
+- **Alert Latency**: <500ms target
+- **WebSocket Updates**: <50ms rendering
+- **API Response**: <100ms average
+- **Database Queries**: <50ms average
+- **Frontend Loading**: <2s initial load
 
 ---
 
-## 📊 Performance Optimization Tips
+## 🎯 Best Practices
 
-### Optimal Configuration
-1. **Limit active instruments** to those actively traded
-2. **Use specific alert conditions** rather than broad ranges
-3. **Set appropriate notification limits** to avoid spam
-4. **Regular database maintenance** for optimal performance
+### Alert Management
+- **Start Simple**: Begin with basic price alerts before advanced indicators
+- **Test Thoroughly**: Validate alert conditions with historical data
+- **Monitor Performance**: Track alert accuracy and false positive rates
+- **Regular Maintenance**: Review and update alert conditions regularly
 
-### Resource Management
-1. **Monitor system resources** during peak hours
-2. **Archive old alert data** regularly
-3. **Optimize WebSocket subscriptions**
-4. **Use efficient chart timeframes**
+### System Maintenance  
+- **Regular Backups**: Implement automated backup procedures
+- **Performance Monitoring**: Regular system health checks
+- **Software Updates**: Keep system and dependencies updated
+- **Security Reviews**: Regular security audit and updates
 
-### Best Practices
-1. **Test alert rules** with paper trading first
-2. **Use alert templates** for consistency
-3. **Regular backup schedules**
-4. **Keep software updated**
+### Data Management
+- **Quality Assurance**: Regular data validation and integrity checks
+- **Storage Optimization**: Efficient data storage and archival policies
+- **Export Strategies**: Regular data exports for backup and analysis
+- **Access Control**: Proper data access and sharing policies
 
 ---
 
-TradeAssist provides professional-grade trading alerts with enterprise reliability. Use this guide to maximize the system's potential for your trading strategy!
+## 🔮 Future Enhancements
+
+### Planned Features
+- **Mobile App**: Native iOS/Android applications
+- **Multi-user Support**: Team collaboration and user management
+- **Additional Brokers**: Integration with more trading platforms
+- **Advanced Analytics**: Enhanced ML models and predictive analytics
+- **Cloud Deployment**: Hosted service options
+
+### Community Features
+- **Alert Sharing**: Community-driven alert templates
+- **Strategy Marketplace**: Share and discover trading strategies
+- **Discussion Forums**: User community and support forums
+- **Educational Content**: Trading education and best practices
+
+---
+
+**🎯 Ready to revolutionize your trading with professional-grade alerts and analytics!**
+
+For technical support and detailed configuration, refer to the [Configuration Guide](CONFIGURATION.md) and [Deployment Guide](DEPLOYMENT.md).

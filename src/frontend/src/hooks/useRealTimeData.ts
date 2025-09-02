@@ -14,6 +14,7 @@ import {
   HealthStatus,
   InstrumentStatus 
 } from '../types';
+import { OutgoingMessage } from '../types/websocket';
 
 // =============================================================================
 // REAL-TIME DATA HOOK
@@ -47,7 +48,7 @@ export interface UseRealTimeDataReturn {
   // Actions
   connect: () => void;
   disconnect: () => void;
-  sendMessage: (message: object) => void;
+  sendMessage: (message: OutgoingMessage) => void;
 }
 
 export const useRealTimeData = (options: UseRealTimeDataOptions = {}): UseRealTimeDataReturn => {
@@ -103,15 +104,15 @@ export const useRealTimeData = (options: UseRealTimeDataOptions = {}): UseRealTi
   }, [realtimeData]);
 
   const getAlertsForInstrument = useCallback((instrumentId: number): AlertLogWithDetails[] => {
-    return recentAlerts.filter(alert => alert.instrument_id === instrumentId);
+    return recentAlerts.filter(alert => alert.instrumentId === instrumentId);
   }, [recentAlerts]);
 
   const isSystemHealthy = useMemo(() => {
     if (!systemHealth) return false;
     
     return systemHealth.status === 'healthy' &&
-           systemHealth.api_connected &&
-           systemHealth.ingestion_active;
+           systemHealth.apiConnected &&
+           systemHealth.ingestionActive;
   }, [systemHealth]);
 
   // =============================================================================
@@ -193,10 +194,10 @@ export const useAlertMonitor = () => {
   const alertsByInstrument = useMemo(() => {
     const grouped: Record<number, AlertLogWithDetails[]> = {};
     recentAlerts.forEach(alert => {
-      if (!grouped[alert.instrument_id]) {
-        grouped[alert.instrument_id] = [];
+      if (!grouped[alert.instrumentId]) {
+        grouped[alert.instrumentId] = [];
       }
-      grouped[alert.instrument_id].push(alert);
+      grouped[alert.instrumentId].push(alert);
     });
     return grouped;
   }, [recentAlerts]);
@@ -243,12 +244,12 @@ export const useSystemHealthMonitor = () => {
 
     return {
       uptime: null, // Not available in Phase 4 structure
-      activeConnections: systemHealth.active_instruments,
+      activeConnections: systemHealth.activeInstruments,
       maxConnections: null, // Not available in Phase 4 structure
       avgEvaluationTime: null, // Not available in Phase 4 structure
       alertsLastHour: null, // Not available in Phase 4 structure
-      schwabApiStatus: systemHealth.api_connected ? 'connected' : 'disconnected',
-      databaseConnections: systemHealth.historical_data_service?.service_running ? 1 : 0
+      schwabApiStatus: systemHealth.apiConnected ? 'connected' : 'disconnected',
+      databaseConnections: systemHealth.historicalDataService?.serviceRunning ? 1 : 0
     };
   }, [systemHealth]);
 
@@ -265,11 +266,11 @@ export const useSystemHealthMonitor = () => {
 // =============================================================================
 
 function calculatePriceChange(instrument: Instrument, marketData: MarketData | null): number | null {
-  if (!marketData?.price || !instrument.last_price) {
+  if (!marketData?.price || !instrument.lastPrice) {
     return null;
   }
   
-  return ((marketData.price - instrument.last_price) / instrument.last_price) * 100;
+  return ((marketData.price - instrument.lastPrice) / instrument.lastPrice) * 100;
 }
 
 function determineInstrumentStatus(

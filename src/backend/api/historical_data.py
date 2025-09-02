@@ -22,7 +22,7 @@ from ..database.connection import get_db_session
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/api/v1/historical-data", tags=["historical-data"])
+router = APIRouter(tags=["historical-data"])
 
 # Global service instance (will be set by main.py)
 historical_data_service: Optional[HistoricalDataService] = None

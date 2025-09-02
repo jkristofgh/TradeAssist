@@ -69,7 +69,7 @@ export const useRealTimeAnalytics = (
     isConnected, 
     subscribe, 
     unsubscribe, 
-    getAnalyticsForInstrument,
+    getAnalyticsForInstrument: getWebSocketAnalytics,
     getTechnicalIndicatorsForInstrument,
     getPricePredictionForInstrument,
     getRiskMetricsForInstrument,
@@ -187,7 +187,7 @@ export const useRealTimeAnalytics = (
         const marketDataUpdate: MarketDataUpdate = {
           instrumentId: marketData.instrumentId,
           symbol: 'unknown', // Symbol not available in MarketData type
-          price: marketData.price,
+          price: marketData.price || 0,
           volume: marketData.volume || 0,
           timestamp: marketData.timestamp,
           bid: marketData.bid || undefined,

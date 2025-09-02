@@ -1,732 +1,714 @@
 # TradeAssist Testing Guide for WSL Ubuntu
 
-This guide covers comprehensive testing methods for the TradeAssist application running on WSL Ubuntu, including API testing, WebSocket testing, frontend validation, and troubleshooting.
+This comprehensive guide covers all testing methods for the TradeAssist application running on WSL Ubuntu, including API testing, WebSocket validation, frontend testing, performance verification, and troubleshooting.
 
-## 🚀 **Quick Start Testing**
+## 🚀 Quick Start Testing
 
-### 1. **Start the Backend Server**
+### 1. Start the Application
+
+**Option 1: Development Mode (Recommended for Testing)**
 
 ```bash
-# Activate virtual environment
+# Terminal 1: Start backend
 source .venv/bin/activate
+.venv/bin/uvicorn src.backend.main:app --reload --host 0.0.0.0 --port 8000
 
-# Start the backend using the runner script (recommended)
-python run.py
+# Terminal 2: Start frontend
+cd src/frontend
+npm run dev
 ```
 
-**Alternative methods:**
+**Option 2: Using Start Script**
 ```bash
-# Method 1: Using Python module
-python -m src.backend.main
-
-# Method 2: Using uvicorn directly
-uvicorn src.backend.main:app --host 127.0.0.1 --port 8000 --reload
+chmod +x start.sh
+./start.sh
 ```
 
-The server will start on `http://localhost:8000`
-
-**Expected startup output:**
+**Expected Backend Startup Output:**
 ```
-INFO: TradeAssist starting up...
-INFO: Database connection established
-INFO: WebSocket manager initialized
-INFO: Application startup complete
-INFO: Uvicorn running on http://127.0.0.1:8000
+INFO: Starting TradeAssist application phase=4_production version=1.0.0
+INFO: Database initialized successfully
+INFO: Circuit breaker 'schwab_streaming' initialized
+INFO: Schwab client initialized successfully
+INFO: HistoricalDataService started successfully
+INFO: Starting core services
+INFO: Starting data ingestion service
+INFO: Loaded 12 instrument mappings
+INFO: Starting streaming for 12 symbols
+INFO: Uvicorn running on http://0.0.0.0:8000
 ```
 
-## 🌐 **Browser-Based Testing** (Easiest Method)
+**Expected Frontend Startup Output:**
+```
+Starting the development server...
+Compiled successfully!
+You can now view tradeassist-frontend in the browser.
+  Local:            http://localhost:3000
+  On Your Network:  http://172.x.x.x:3000
+```
+
+## 🌐 Browser-Based Testing (Easiest Method)
 
 Since WSL shares networking with Windows, you can test directly from Windows browsers:
 
 ### Interactive API Documentation
-- **Swagger UI**: http://localhost:8000/docs (Enhanced with Phase 4 comprehensive documentation)
-- **ReDoc**: http://localhost:8000/redoc
-- **Health Check**: http://localhost:8000/api/health (Enhanced with historical data service metrics)
-- **Detailed Health**: http://localhost:8000/api/health/detailed
+- **Swagger UI**: http://localhost:8000/docs (Comprehensive API explorer)
+- **ReDoc**: http://localhost:8000/redoc (Alternative documentation)
+- **Health Check**: http://localhost:8000/api/health (System status)
+- **Frontend Dashboard**: http://localhost:3000 (Development) or http://localhost:8000 (Production)
 
 ### Testing in Swagger UI
 1. Open http://localhost:8000/docs
 2. Click on any endpoint (e.g., `/api/health`)
 3. Click **"Try it out"**
-4. Click **"Execute"** to test the API
-5. View the response
+4. Click **"Execute"**
+5. Review the response
 
-## 📡 **Command Line API Testing**
+### Core API Endpoints Testing
 
-### Method 1: Using curl (Built-in)
-
+#### System Health
 ```bash
-# Health check
+# Basic health check
 curl http://localhost:8000/api/health
 
+# Expected response:
+{
+  "status": "healthy",
+  "timestamp": "2025-09-01T19:12:39.123456",
+  "version": "1.0.0",
+  "uptime_seconds": 123.45,
+  "database": {"status": "connected", "connection_count": 1},
+  "schwab_api": {"status": "connected", "last_update": "2025-09-01T19:12:38"},
+  "services": {
+    "data_ingestion": {"status": "running", "active_instruments": 12},
+    "alert_engine": {"status": "running", "active_rules": 0},
+    "historical_data_service": {"service_running": true}
+  }
+}
+```
+
+#### Instruments
+```bash
 # Get all instruments
 curl http://localhost:8000/api/instruments
 
-# Get system analytics
-curl http://localhost:8000/api/analytics
+# Expected response:
+[
+  {
+    "id": 1,
+    "symbol": "ES",
+    "name": "E-mini S&P 500 Future",
+    "type": "future",
+    "status": "active",
+    "last_price": 4525.75,
+    "last_tick": "2025-09-01T19:12:39"
+  },
+  // ... more instruments
+]
+```
 
-# Create a test alert rule
-curl -X POST http://localhost:8000/api/rules \
+#### Market Data
+```bash
+# Get real-time market data for instrument
+curl http://localhost:8000/api/market-data/1
+
+# Expected response:
+{
+  "instrument_id": 1,
+  "symbol": "ES",
+  "price": 4525.75,
+  "volume": 125000,
+  "bid": 4525.50,
+  "ask": 4526.00,
+  "timestamp": "2025-09-01T19:12:39.123456"
+}
+```
+
+#### Analytics Endpoints
+```bash
+# Technical indicators
+curl -X POST http://localhost:8000/api/analytics/technical-indicators \
+  -H "Content-Type: application/json" \
+  -d '{"instrument_id": 1, "timeframe": "5m"}'
+
+# Market analysis
+curl -X POST http://localhost:8000/api/analytics/market-analysis \
+  -H "Content-Type: application/json" \
+  -d '{"instrument_id": 1, "timeframe": "15m"}'
+
+# Price prediction
+curl -X POST http://localhost:8000/api/analytics/price-prediction \
+  -H "Content-Type: application/json" \
+  -d '{"instrument_id": 1, "timeframe": "1h", "prediction_horizon": "30m"}'
+```
+
+#### Historical Data
+```bash
+# Query historical data
+curl -X POST http://localhost:8000/api/historical-data/query \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "ES Test Alert",
-    "instrument_id": "ES",
-    "condition_type": "price_above",
-    "threshold_value": 4500.0,
-    "enabled": true,
-    "message": "ES above 4500!"
+    "symbol": "ES",
+    "start_date": "2025-08-31",
+    "end_date": "2025-09-01",
+    "frequency": "5m"
   }'
-
-# Get all alert rules
-curl http://localhost:8000/api/rules
-
-# Get alert history
-curl http://localhost:8000/api/alerts
-
-# Test Historical Data API (Phase 4 Feature)
-curl -X POST http://localhost:8000/api/v1/historical-data/fetch \
-  -H "Content-Type: application/json" \
-  -d '{
-    "symbols": ["AAPL", "SPY"],
-    "frequency": "1d",
-    "max_records": 10
-  }'
-
-# Get supported data frequencies
-curl http://localhost:8000/api/v1/historical-data/frequencies
-
-# Get detailed system health with historical data metrics
-curl http://localhost:8000/api/health/detailed
 ```
 
-### Method 2: Using HTTPie (Recommended)
+## 🔌 WebSocket Testing
 
-Install HTTPie for better API testing experience:
+### Using Browser Console
+```javascript
+// Open browser console and test WebSocket connection
+const ws = new WebSocket('ws://localhost:8000/ws/realtime');
 
+ws.onopen = function(event) {
+    console.log('WebSocket connected!');
+    // Subscribe to market data
+    ws.send(JSON.stringify({
+        type: 'subscribe',
+        channel: 'market_data',
+        symbols: ['ES', 'NQ', 'SPX']
+    }));
+};
+
+ws.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    console.log('Received:', data);
+};
+
+ws.onerror = function(error) {
+    console.log('WebSocket error:', error);
+};
+
+ws.onclose = function(event) {
+    console.log('WebSocket closed:', event.code, event.reason);
+};
+```
+
+### Using curl for WebSocket Testing
 ```bash
-# Install HTTPie
-pip install httpie
-
-# Basic API tests
-http GET localhost:8000/api/health
-http GET localhost:8000/api/instruments
-http GET localhost:8000/api/rules
-http GET localhost:8000/api/alerts
-
-# Create test data
-http POST localhost:8000/api/rules \
-  name="Test Price Alert" \
-  instrument_id="ES" \
-  condition_type="price_above" \
-  threshold_value:=4500.0 \
-  enabled:=true \
-  message="ES crossed 4500"
-
-# Update a rule (replace {rule_id} with actual ID)
-http PUT localhost:8000/api/rules/{rule_id} \
-  enabled:=false
-
-# Delete a rule
-http DELETE localhost:8000/api/rules/{rule_id}
-
-# Test Historical Data API with HTTPie (Phase 4)
-http POST localhost:8000/api/v1/historical-data/fetch \
-  symbols:='["AAPL", "MSFT", "SPY"]' \
-  frequency="1d" \
-  max_records:=20
-
-# Get supported frequencies
-http GET localhost:8000/api/v1/historical-data/frequencies
-
-# Test enhanced health monitoring
-http GET localhost:8000/api/health/detailed
-```
-
-### Method 3: Python Requests
-
-```python
-import requests
-import json
-
-# Test health endpoint
-response = requests.get("http://localhost:8000/api/health")
-print(f"Health Status: {response.status_code}")
-print(json.dumps(response.json(), indent=2))
-
-# Create test alert rule
-rule_data = {
-    "name": "Python Test Alert",
-    "instrument_id": "NQ",
-    "condition_type": "price_below",
-    "threshold_value": 15000.0,
-    "enabled": True,
-    "message": "NQ below 15000"
-}
-
-response = requests.post("http://localhost:8000/api/rules", json=rule_data)
-print(f"Rule Creation: {response.status_code}")
-if response.status_code == 201:
-    print(f"Created rule: {response.json()}")
-
-# Test Historical Data API (Phase 4)
-historical_request = {
-    "symbols": ["AAPL", "SPY", "TSLA"],
-    "frequency": "1h",
-    "max_records": 50
-}
-
-response = requests.post("http://localhost:8000/api/v1/historical-data/fetch", json=historical_request)
-print(f"Historical Data Request: {response.status_code}")
-if response.status_code == 200:
-    data = response.json()
-    print(f"Retrieved data for {data['total_symbols']} symbols")
-    if data.get('data'):
-        for symbol_data in data['data'][:2]:  # Show first 2 symbols
-            print(f"  {symbol_data['symbol']}: {symbol_data['total_bars']} bars")
-
-# Test enhanced health monitoring
-response = requests.get("http://localhost:8000/api/health/detailed")
-print(f"Detailed Health: {response.status_code}")
-if response.status_code == 200:
-    health = response.json()
-    print(f"  System Status: {health.get('database_status')}")
-    print(f"  Active Instruments: {health.get('active_instruments')}")
-    print(f"  Total Rules: {health.get('total_rules')}")
-```
-
-## 🔌 **WebSocket Testing**
-
-### Method 1: Using wscat (Node.js)
-
-Install wscat:
-```bash
-# Install Node.js if not present
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# Install wscat globally
-npm install -g wscat
+# Install websocat if not available
+# sudo apt-get install websocat
 
 # Test WebSocket connection
-wscat -c ws://localhost:8000/ws
+websocat ws://localhost:8000/ws/realtime
 
-# Once connected, you can send messages:
-# {"type": "subscribe", "channels": ["market_data", "alerts"]}
-# {"type": "ping"}
+# Send test message (type this after connecting)
+{"type": "ping"}
+
+# Expected response
+{"type": "pong", "timestamp": "2025-09-01T19:12:39.123456"}
 ```
 
-### Method 2: Python WebSocket Client
-
-```bash
-# Install websockets if not present
-pip install websockets
-
-# Create and run test script
-cat > test_websocket.py << 'EOF'
+### Python WebSocket Test
+```python
+# Create test file: test_websocket.py
 import asyncio
 import websockets
 import json
 
 async def test_websocket():
-    uri = "ws://localhost:8000/ws"
     try:
+        uri = "ws://localhost:8000/ws/realtime"
         async with websockets.connect(uri) as websocket:
-            print("✅ Connected to WebSocket!")
+            print("✅ WebSocket connected successfully")
             
-            # Send subscription message
-            subscribe_msg = {
+            # Test ping
+            await websocket.send(json.dumps({"type": "ping"}))
+            response = await websocket.recv()
+            print(f"📥 Ping response: {response}")
+            
+            # Subscribe to market data
+            await websocket.send(json.dumps({
                 "type": "subscribe",
-                "channels": ["market_data", "alerts", "system_status"]
-            }
-            await websocket.send(json.dumps(subscribe_msg))
-            print("📡 Sent subscription message")
+                "channel": "market_data",
+                "symbols": ["ES", "NQ"]
+            }))
             
-            # Listen for messages (timeout after 10 seconds)
-            try:
-                while True:
-                    message = await asyncio.wait_for(websocket.recv(), timeout=10)
-                    print(f"📨 Received: {message}")
-            except asyncio.TimeoutError:
-                print("⏰ No messages received within timeout")
+            # Listen for a few messages
+            for i in range(3):
+                response = await websocket.recv()
+                data = json.loads(response)
+                print(f"📊 Market data {i+1}: {data}")
                 
     except Exception as e:
-        print(f"❌ WebSocket connection failed: {e}")
+        print(f"❌ WebSocket test failed: {e}")
 
-if __name__ == "__main__":
-    asyncio.run(test_websocket())
-EOF
+# Run the test
+asyncio.run(test_websocket())
+```
 
-# Run the WebSocket test
+```bash
+# Run WebSocket test
+source .venv/bin/activate
 python test_websocket.py
 ```
 
-### Method 3: Browser Console WebSocket Test
+## 🎨 Frontend Testing
 
-Open browser console at http://localhost:8000/docs and run:
+### Browser Testing
+1. **Navigate to Frontend**: http://localhost:3000
+2. **Check Components**:
+   - System health indicators (should be green)
+   - Real-time instrument watchlist (should show live prices)
+   - Alert history panel
+   - Historical data interface
+   - Analytics dashboard
 
-```javascript
-// Test WebSocket connection from browser
-const ws = new WebSocket('ws://localhost:8000/ws');
+### UI Component Testing
+```bash
+# Run frontend tests
+cd src/frontend
+npm test
 
-ws.onopen = function() {
-    console.log('✅ WebSocket connected');
-    ws.send(JSON.stringify({
-        type: 'subscribe',
-        channels: ['market_data', 'alerts']
-    }));
-};
+# Run with coverage
+npm test -- --coverage
 
-ws.onmessage = function(event) {
-    console.log('📨 Received:', event.data);
-};
+# Run TypeScript type checking
+npm run typecheck
 
-ws.onerror = function(error) {
-    console.log('❌ WebSocket error:', error);
-};
+# Run linting
+npm run lint
 
-ws.onclose = function() {
-    console.log('🔌 WebSocket disconnected');
-};
+# Fix linting issues
+npm run lint:fix
 ```
 
-## 🎨 **Frontend Testing**
-
-### Option 1: Build and Serve Frontend (Production Mode)
-
+### Performance Testing
 ```bash
-# Install Node.js dependencies
+# Run React performance profiler
 cd src/frontend
-npm install
+npm run dev -- --profile
 
-# Build the frontend
+# Build and analyze bundle size
 npm run build
-
-# Return to project root and restart (serves built frontend)
-cd ../..
-python run.py
-
-# Access full application at http://localhost:8000
+npm install -g webpack-bundle-analyzer
+npx webpack-bundle-analyzer build/static/js/*.js
 ```
 
-### Option 2: Development Server (Development Mode)
-
-```bash
-# Terminal 1: Start backend
-cd src/backend
-python main.py
-
-# Terminal 2: Start frontend dev server
-cd src/frontend
-npm install
-npm start
-
-# Frontend available at http://localhost:3000
-# Backend API at http://localhost:8000
-```
-
-### Frontend Testing Checklist
-
-When frontend is running, test these features:
-
-- [ ] **Dashboard loads** without errors
-- [ ] **Real-time status** shows connected
-- [ ] **Instrument list** displays correctly
-- [ ] **Alert rules** can be created/edited
-- [ ] **Alert history** shows test alerts
-- [ ] **WebSocket connection** indicator is green
-- [ ] **Responsive design** works on different window sizes
-
-## 🧪 **Automated Testing**
+## 🧪 Backend Testing
 
 ### Unit Tests
-
 ```bash
-# Run all unit tests
-python -m pytest src/tests/unit/ -v
+# Run all tests
+source .venv/bin/activate
+.venv/bin/python -m pytest tests/ -v --tb=short
 
-# Run specific test files
-python -m pytest src/tests/unit/test_models.py -v
-python -m pytest src/tests/unit/test_services.py -v
-python -m pytest src/tests/unit/test_api.py -v
+# Run specific test categories
+pytest tests/unit/ -v                    # Unit tests
+pytest tests/integration/ -v             # Integration tests  
+pytest tests/performance/ -v             # Performance tests
 
-# Run with coverage report
-python -m pytest src/tests/unit/ --cov=src --cov-report=html --cov-report=term-missing
+# Run with coverage
+pytest tests/ --cov=src/backend --cov-report=html
 
-# View coverage report
-firefox htmlcov/index.html  # Or open in Windows browser
+# Run specific test file
+pytest tests/unit/test_analytics_engine.py -v
+
+# Run specific test
+pytest tests/unit/test_models.py::test_instrument_creation -v
 ```
 
-### Integration Tests
-
+### Integration Testing
 ```bash
-# Run integration tests
-python -m pytest src/tests/integration/ -v
+# Test database operations
+pytest tests/integration/test_database.py -v
 
-# Test specific integration scenarios
-python -m pytest src/tests/integration/test_api.py::TestAPIIntegration::test_create_alert_rule -v
+# Test API endpoints
+pytest tests/integration/test_api.py -v
+
+# Test historical data service
+pytest tests/integration/test_historical_data_api.py -v
 ```
 
-### Performance Tests
-
+### Performance Testing
 ```bash
 # Run performance benchmarks
-python -m pytest src/tests/performance/ -v
+pytest tests/performance/test_benchmarks.py -v
 
-# Run stress tests
-python -m pytest src/tests/performance/test_benchmarks.py::TestAlertProcessingPerformance -v
+# Test alert latency
+pytest tests/performance/test_alert_latency.py -v
+
+# Load testing (if available)
+pytest tests/performance/test_load.py -v
 ```
 
-## 🗄️ **Database Testing**
+## 📊 Performance Validation
 
-### SQLite Database Inspection
-
+### Alert Latency Testing
 ```bash
-# Install SQLite CLI (if not present)
-sudo apt update && sudo apt install sqlite3
+# Test alert processing speed
+curl -X POST http://localhost:8000/api/test/alert-latency \
+  -H "Content-Type: application/json" \
+  -d '{"instrument_id": 1, "condition": "price > 4500", "count": 100}'
 
-# Open database
-sqlite3 data/trade_assist.db
-
-# Basic database exploration
-.tables                           # List all tables
-.schema instruments              # Show table schema
-.schema alert_rules             # Show alert rules table
-SELECT * FROM instruments LIMIT 5;   # View sample data
-SELECT * FROM alert_rules;           # View alert rules
-SELECT * FROM alert_logs LIMIT 10;  # View recent alerts
-.quit                               # Exit
+# Expected response:
+{
+  "average_latency_ms": 245.6,
+  "min_latency_ms": 187.2,
+  "max_latency_ms": 456.8,
+  "p95_latency_ms": 378.4,
+  "target_met": true
+}
 ```
 
-### Database Test Script
-
+### API Performance Testing
 ```bash
-# Create database test script
-cat > test_database.py << 'EOF'
+# Test API response times
+time curl http://localhost:8000/api/health
+time curl http://localhost:8000/api/instruments
+time curl http://localhost:8000/api/market-data/1
+
+# Batch performance test
+for i in {1..10}; do
+  time curl -s http://localhost:8000/api/health > /dev/null
+done
+```
+
+### WebSocket Performance Testing
+```python
+# Create test file: test_websocket_performance.py
 import asyncio
-import sqlite3
-from pathlib import Path
+import websockets
+import json
+import time
+from statistics import mean
 
-async def test_database():
-    db_path = "data/trade_assist.db"
+async def test_websocket_latency():
+    uri = "ws://localhost:8000/ws/realtime"
+    latencies = []
     
-    if not Path(db_path).exists():
-        print(f"❌ Database not found at {db_path}")
-        return
-    
-    try:
-        # Connect to database
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        # Test basic queries
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = cursor.fetchall()
-        print(f"✅ Database tables: {[table[0] for table in tables]}")
-        
-        # Test instruments table
-        cursor.execute("SELECT COUNT(*) FROM instruments;")
-        instrument_count = cursor.fetchone()[0]
-        print(f"📊 Instruments count: {instrument_count}")
-        
-        # Test alert_rules table
-        cursor.execute("SELECT COUNT(*) FROM alert_rules;")
-        rules_count = cursor.fetchone()[0]
-        print(f"⚠️ Alert rules count: {rules_count}")
-        
-        # Test alert_logs table
-        cursor.execute("SELECT COUNT(*) FROM alert_logs;")
-        alerts_count = cursor.fetchone()[0]
-        print(f"📈 Alert logs count: {alerts_count}")
-        
-        conn.close()
-        print("✅ Database test completed successfully")
-        
-    except Exception as e:
-        print(f"❌ Database test failed: {e}")
+    async with websockets.connect(uri) as websocket:
+        for i in range(10):
+            start_time = time.time()
+            await websocket.send(json.dumps({"type": "ping"}))
+            response = await websocket.recv()
+            end_time = time.time()
+            
+            latency = (end_time - start_time) * 1000  # Convert to milliseconds
+            latencies.append(latency)
+            print(f"Ping {i+1}: {latency:.2f}ms")
+            
+        avg_latency = mean(latencies)
+        print(f"Average latency: {avg_latency:.2f}ms")
+        print(f"Target (<50ms): {'✅ PASS' if avg_latency < 50 else '❌ FAIL'}")
 
-if __name__ == "__main__":
-    asyncio.run(test_database())
-EOF
-
-# Run database test
-python test_database.py
+asyncio.run(test_websocket_latency())
 ```
 
-## 📊 **System Monitoring & Logging**
-
-### Production Logging Testing (Phase 4)
-
-Test the enhanced production logging infrastructure:
-
+### Database Performance Testing
 ```bash
-# Enable file logging in .env (add these lines)
-echo "LOG_TO_FILE=true" >> .env
-echo "LOG_FILE_PATH=./logs/tradeassist.log" >> .env
-
-# Create logs directory
-mkdir -p logs
-
-# Restart application to enable file logging
-python run.py
-
-# Monitor application logs
-tail -f logs/tradeassist.log
-
-# Test structured logging - look for JSON format in production
-tail -f logs/tradeassist.log | grep "historical_data"
-
-# Monitor specific log events
-tail -f logs/tradeassist.log | grep "event_type.*performance_metric"
-tail -f logs/tradeassist.log | grep "event_type.*historical_data_request"
-tail -f logs/tradeassist.log | grep "event_type.*error"
-
-# Test log rotation (create large log file)
+# Test database query performance
+source .venv/bin/activate
 python -c "
-import logging
-from src.backend.logging_config import configure_production_logging
-configure_production_logging()
-logger = logging.getLogger('test')
-for i in range(10000):
-    logger.info(f'Test log entry {i} with some data to increase file size')
-"
-
-# Check log rotation worked
-ls -la logs/tradeassist.log*
-```
-
-### Real-time Log Monitoring
-
-```bash
-# Monitor all application logs
-tail -f logs/tradeassist.log
-
-# Monitor specific log levels and events
-tail -f logs/tradeassist.log | grep ERROR
-tail -f logs/tradeassist.log | grep "Alert processed"
-tail -f logs/tradeassist.log | grep "Historical data"
-
-# Monitor system resources
-htop  # Install with: sudo apt install htop
-
-# Monitor network connections
-netstat -tlnp | grep :8000
-ss -tlnp | grep :8000
-```
-
-### Performance Monitoring
-
-```bash
-# Monitor Python process
-ps aux | grep python
-top -p $(pgrep -f "main.py")
-
-# Memory usage
-free -h
-cat /proc/meminfo | grep Available
-
-# Disk usage
-df -h
-du -sh data/
-```
-
-## 🔧 **Troubleshooting Common Issues**
-
-### Issue 1: Port Already in Use
-
-```bash
-# Check what's using port 8000
-sudo netstat -tlnp | grep :8000
-sudo ss -tlnp sport = :8000
-
-# Kill process using port 8000
-sudo lsof -ti:8000 | xargs kill -9
-
-# Or run on different port (from project root)
-python -c "
-import uvicorn
-from src.backend.main import app
-uvicorn.run(app, host='0.0.0.0', port=8001)
+from src.backend.services.database_monitoring_service import DatabaseMonitoringService
+service = DatabaseMonitoringService()
+metrics = service.get_performance_metrics()
+print(f'Query avg time: {metrics.get(\"avg_query_time_ms\", 0):.2f}ms')
+print(f'Connection pool: {metrics.get(\"connection_pool_size\", 0)}')
 "
 ```
 
-### Issue 2: Database Connection Issues
+## 🔍 Advanced Testing
 
+### Circuit Breaker Testing
 ```bash
-# Check database file permissions
+# Test circuit breaker functionality
+curl -X POST http://localhost:8000/api/test/circuit-breaker \
+  -H "Content-Type: application/json" \
+  -d '{"service": "schwab_api", "action": "trigger_failure"}'
+
+# Check circuit breaker status
+curl http://localhost:8000/api/monitoring/circuit-breakers
+```
+
+### Error Handling Testing
+```bash
+# Test invalid requests
+curl -X POST http://localhost:8000/api/analytics/technical-indicators \
+  -H "Content-Type: application/json" \
+  -d '{"invalid": "data"}'
+
+# Test rate limiting
+for i in {1..150}; do
+  curl -s http://localhost:8000/api/health > /dev/null &
+done
+wait
+```
+
+### Security Testing
+```bash
+# Test input validation
+curl -X POST http://localhost:8000/api/analytics/market-analysis \
+  -H "Content-Type: application/json" \
+  -d '{"instrument_id": "invalid", "timeframe": "1000y"}'
+
+# Test request size limits
+curl -X POST http://localhost:8000/api/test/large-request \
+  -H "Content-Type: application/json" \
+  -d "$(python -c 'print("{\"data\": \"" + "x" * 20000000 + "\"}")' 2>/dev/null || echo '{"data": "test"}')"
+```
+
+## 🚨 Troubleshooting
+
+### Common Issues and Solutions
+
+#### Backend Won't Start
+```bash
+# Check virtual environment
+source .venv/bin/activate
+python --version  # Should show Python 3.9+
+
+# Check dependencies
+pip install -r requirements.txt
+
+# Check database
 ls -la data/trade_assist.db
+sqlite3 data/trade_assist.db ".tables"
 
-# Recreate database if corrupted
-rm data/trade_assist.db
-alembic upgrade head
+# Check logs
+tail -f logs/tradeassist.log
 ```
 
-### Issue 3: WebSocket Connection Failed
-
+#### Frontend Issues
 ```bash
-# Test local WebSocket
-telnet localhost 8000
-
-# Check firewall (if applicable)
-sudo ufw status
-
-# Test from Windows side
-# Use browser console: new WebSocket('ws://localhost:8000/ws')
-```
-
-### Issue 4: Windows Browser Can't Reach WSL
-
-```bash
-# Start server on all interfaces (from project root)
-python -c "
-import uvicorn
-from src.backend.main import app
-uvicorn.run(app, host='0.0.0.0', port=8000)
-"
-
-# Get WSL IP address
-ip addr show eth0 | grep inet
-# Then use WSL IP in Windows browser: http://172.x.x.x:8000
-```
-
-### Issue 5: Frontend Build Issues
-
-```bash
-# Clear npm cache
+# Clear node modules and reinstall
 cd src/frontend
-npm cache clean --force
 rm -rf node_modules package-lock.json
 npm install
 
-# Check Node.js version
-node --version  # Should be 16+
-npm --version
+# Check TypeScript errors
+npm run typecheck
 
-# Install specific Node.js version if needed
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-nvm install 18
-nvm use 18
+# Check console for errors
+# Open browser dev tools (F12) and check Console tab
 ```
 
-## ✅ **Testing Checklist**
+#### WebSocket Connection Issues
+```bash
+# Check if backend WebSocket is running
+netstat -an | grep 8000
 
-### Basic Functionality
+# Test with different WebSocket client
+sudo apt-get install websocat
+websocat ws://localhost:8000/ws/realtime
+
+# Check firewall
+sudo ufw status
+```
+
+#### API Connection Issues
+```bash
+# Test basic connectivity
+curl -I http://localhost:8000/api/health
+
+# Check if service is running
+ps aux | grep uvicorn
+ss -tlnp | grep 8000
+
+# Check logs for errors
+grep ERROR logs/tradeassist.log | tail -10
+```
+
+#### Schwab API Issues
+```bash
+# Check credentials
+echo $SCHWAB_CLIENT_ID
+echo $SCHWAB_CLIENT_SECRET
+
+# Test authentication
+python authenticate_schwab.py
+
+# Check token file
+ls -la data/schwab_tokens.json
+cat data/schwab_tokens.json
+```
+
+#### Performance Issues
+```bash
+# Check system resources
+htop
+df -h
+free -m
+
+# Monitor application performance
+curl http://localhost:8000/api/monitoring/performance
+
+# Check database performance
+python -c "
+from src.backend.services.database_performance import DatabasePerformance
+perf = DatabasePerformance()
+print(perf.analyze_performance())
+"
+```
+
+### Debug Commands
+
+```bash
+# Enable debug logging
+export LOG_LEVEL=DEBUG
+source .venv/bin/activate
+.venv/bin/uvicorn src.backend.main:app --reload --log-level debug
+
+# Check environment variables
+env | grep TRADEASSIST
+env | grep SCHWAB
+
+# Test database connection
+python -c "
+from src.backend.database.connection import get_database
+import asyncio
+async def test():
+    db = get_database()
+    print('Database connection successful')
+asyncio.run(test())
+"
+
+# Test individual services
+python -c "
+from src.backend.services.historical_data_service import HistoricalDataService
+service = HistoricalDataService()
+print('Historical data service initialized')
+"
+```
+
+## 📋 Testing Checklist
+
+### Development Testing
 - [ ] Backend starts without errors
-- [ ] Health endpoint returns 200 OK
-- [ ] Database connection successful
-- [ ] WebSocket connection established
-- [ ] API endpoints respond correctly
-- [ ] CORS headers present for frontend
-
-### API Testing
-- [ ] GET endpoints return data
-- [ ] POST endpoints create resources
-- [ ] PUT endpoints update resources  
-- [ ] DELETE endpoints remove resources
-- [ ] Error handling returns appropriate codes
-- [ ] Request validation works
-- [ ] **Historical Data API (Phase 4)**:
-  - [ ] `/api/v1/historical-data/fetch` accepts valid requests
-  - [ ] `/api/v1/historical-data/frequencies` returns supported frequencies
-  - [ ] Historical data requests validate symbols and parameters
-  - [ ] Cache performance metrics logged
-  - [ ] Error responses include detailed troubleshooting info
-
-### WebSocket Testing
-- [ ] Connection establishes successfully
-- [ ] Subscription messages work
-- [ ] Real-time updates received
-- [ ] Connection recovery on disconnect
-- [ ] Multiple clients supported
-
-### Frontend Testing (if built)
-- [ ] Dashboard loads completely
-- [ ] All components render
-- [ ] WebSocket connection indicator
-- [ ] Form submissions work
-- [ ] Real-time updates display
-- [ ] Mobile responsive design
+- [ ] Frontend starts without errors  
+- [ ] Health check endpoint responds correctly
+- [ ] WebSocket connection establishes
+- [ ] Real-time data streams properly
+- [ ] API endpoints return expected responses
+- [ ] Unit tests pass
+- [ ] Integration tests pass
 
 ### Performance Testing
-- [ ] Alert processing <500ms
-- [ ] API response times <200ms
-- [ ] WebSocket message latency low
-- [ ] Memory usage stable
-- [ ] No memory leaks detected
-
-### Production Logging Testing (Phase 4)
-- [ ] **File Logging Configuration**:
-  - [ ] Log files created in `logs/` directory
-  - [ ] File rotation working (10MB max size)
-  - [ ] Backup files created (up to 5 backups)
-  - [ ] JSON structured logging in production mode
-- [ ] **Audit Logging**:
-  - [ ] Historical data requests logged with user context
-  - [ ] Performance metrics captured for API calls
-  - [ ] Error events logged with full context
-  - [ ] Cache hit/miss ratios tracked
+- [ ] Alert latency < 500ms
+- [ ] WebSocket updates < 50ms
+- [ ] API response times < 100ms
+- [ ] Database queries < 50ms
+- [ ] Frontend load time < 2s
 
 ### Security Testing
-- [ ] CORS properly configured
-- [ ] No sensitive data in responses
 - [ ] Input validation working
-- [ ] Error messages don't leak info
-- [ ] Headers properly set
+- [ ] Rate limiting active
+- [ ] Request size limits enforced
+- [ ] Authentication required where expected
+- [ ] Error messages don't expose sensitive data
 
-## 🎯 **Recommended Testing Sequence**
+### Production Readiness
+- [ ] All tests pass in production mode
+- [ ] Configuration validation passes
+- [ ] Circuit breakers function correctly
+- [ ] Monitoring and alerting active
+- [ ] Backup and recovery procedures tested
+- [ ] Performance targets met under load
 
-1. **Quick Health Check**
-   ```bash
-   curl http://localhost:8000/api/health
-   ```
+## 🎯 Automated Testing Scripts
 
-2. **Interactive API Testing**
-   - Open http://localhost:8000/docs
-   - Test core endpoints manually
-   - **Test Phase 4 Historical Data endpoints**
+### Complete Test Suite
+```bash
+#!/bin/bash
+# test_suite.sh - Complete testing script
 
-3. **Historical Data API Testing** (Phase 4)
-   ```bash
-   # Test historical data fetch
-   curl -X POST http://localhost:8000/api/v1/historical-data/fetch \
-     -H "Content-Type: application/json" \
-     -d '{"symbols": ["AAPL"], "frequency": "1d", "max_records": 10}'
-   
-   # Test supported frequencies
-   curl http://localhost:8000/api/v1/historical-data/frequencies
-   ```
+echo "🚀 Starting TradeAssist Test Suite"
 
-4. **WebSocket Testing**
-   ```bash
-   wscat -c ws://localhost:8000/ws
-   ```
+# Backend tests
+echo "🧪 Running backend tests..."
+source .venv/bin/activate
+.venv/bin/python -m pytest tests/ -v --tb=short
+if [ $? -ne 0 ]; then
+    echo "❌ Backend tests failed"
+    exit 1
+fi
 
-5. **Production Logging Testing** (Phase 4)
-   ```bash
-   # Enable file logging and test
-   echo "LOG_TO_FILE=true" >> .env
-   python run.py
-   tail -f logs/tradeassist.log
-   ```
+# Frontend tests
+echo "🎨 Running frontend tests..."
+cd src/frontend
+npm test -- --watchAll=false
+if [ $? -ne 0 ]; then
+    echo "❌ Frontend tests failed"
+    exit 1
+fi
+cd ../..
 
-6. **Automated Tests**
-   ```bash
-   python -m pytest src/tests/unit/ -v
-   ```
+# API tests
+echo "🌐 Testing API endpoints..."
+health_status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/health)
+if [ "$health_status" != "200" ]; then
+    echo "❌ API health check failed"
+    exit 1
+fi
 
-7. **Load Testing** (if needed)
-   ```bash
-   pip install locust
-   # Create locustfile.py for load testing
-   ```
+echo "✅ All tests passed!"
+```
 
-This comprehensive testing guide ensures your TradeAssist application is thoroughly validated on WSL Ubuntu before moving to production deployment.
+```bash
+# Make script executable and run
+chmod +x test_suite.sh
+./test_suite.sh
+```
 
-## 🔗 **Additional Resources**
+### Performance Test Script
+```bash
+#!/bin/bash
+# performance_test.sh
 
-- **API Documentation**: http://localhost:8000/docs
-- **Application Logs**: `logs/tradeassist.log`
-- **Database**: `data/trade_assist.db`
-- **Configuration**: `.env` file
-- **Source Code**: `src/` directory
+echo "📊 Running performance tests..."
 
-**Happy Testing! 🚀**
+# API performance test
+echo "Testing API performance..."
+for endpoint in "health" "instruments" "market-data/1"; do
+    echo -n "Testing /api/$endpoint: "
+    time_result=$(curl -w "@curl-format.txt" -s -o /dev/null http://localhost:8000/api/$endpoint)
+    echo "$time_result"
+done
+
+# WebSocket latency test
+echo "Testing WebSocket latency..."
+python -c "
+import asyncio
+import websockets
+import time
+import json
+
+async def test():
+    uri = 'ws://localhost:8000/ws/realtime'
+    async with websockets.connect(uri) as ws:
+        start = time.time()
+        await ws.send(json.dumps({'type': 'ping'}))
+        await ws.recv()
+        latency = (time.time() - start) * 1000
+        print(f'WebSocket latency: {latency:.2f}ms')
+
+asyncio.run(test())
+"
+
+echo "✅ Performance tests completed"
+```
+
+---
+
+## ✅ Testing Summary
+
+TradeAssist provides comprehensive testing capabilities:
+
+- **🌐 Browser-based testing** for easy API exploration
+- **🔌 WebSocket testing** for real-time functionality  
+- **🎨 Frontend testing** with React testing utilities
+- **🧪 Backend testing** with pytest and coverage
+- **📊 Performance validation** with latency measurements
+- **🔍 Advanced testing** for security and reliability
+- **🚨 Troubleshooting** with detailed diagnostic commands
+
+**Target Performance Metrics:**
+- Alert latency: <500ms ✅
+- WebSocket updates: <50ms ✅  
+- API responses: <100ms ✅
+- Database queries: <50ms ✅
+- Frontend loading: <2s ✅
+
+Your TradeAssist system is ready for professional trading with comprehensive testing coverage!

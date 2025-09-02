@@ -62,8 +62,8 @@ class SchwabOAuthService:
         self.client_secret = self.settings.SCHWAB_CLIENT_SECRET  
         self.redirect_uri = self.settings.SCHWAB_REDIRECT_URI
         self.base_url = "https://api.schwabapi.com"
-        self.auth_url = "https://api.schwabapi.com/oauth/authorize"
-        self.token_url = "https://api.schwabapi.com/oauth/token"
+        self.auth_url = "https://api.schwabapi.com/v1/oauth/authorize"
+        self.token_url = "https://api.schwabapi.com/v1/oauth/token"
         
         # OAuth state storage (in production, use Redis or database)
         self._oauth_states: Dict[str, OAuthState] = {}
@@ -111,7 +111,7 @@ class SchwabOAuthService:
                 "response_type": "code",
                 "client_id": self.client_id,
                 "redirect_uri": self.redirect_uri,
-                "scope": "MarketData",  # Schwab API scope for market data
+                "scope": "readonly",  # Schwab API scope for readonly access
                 "state": state,
             }
             
@@ -120,7 +120,7 @@ class SchwabOAuthService:
             logger.info("OAuth flow initiated", 
                        state=state, 
                        user_id=user_id,
-                       scope="MarketData")
+                       scope="readonly")
             
             return {
                 "authorization_url": authorization_url,

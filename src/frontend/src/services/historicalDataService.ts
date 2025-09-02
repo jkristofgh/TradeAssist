@@ -135,7 +135,7 @@ export interface ServiceHealth {
 // =============================================================================
 
 class HistoricalDataService {
-  private baseEndpoint = '/api/v1/historical-data';
+  private baseEndpoint = '/api/historical-data';
 
   // =============================================================================
   // DATA FETCHING

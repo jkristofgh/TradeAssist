@@ -251,9 +251,7 @@ async def get_health_status() -> dict:
             # Calculate performance metrics
             processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
             
-            return response_builder.success(health_data) \
-                .with_performance_metrics(processing_time, active_instruments + total_rules) \
-                .build()
+            return response_builder.success(health_data)
             
     except StandardAPIError:
         raise

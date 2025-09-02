@@ -1,262 +1,332 @@
 # TradeAssist - Real-Time Trading Alerts System
 
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.68+-green.svg)](https://fastapi.tiangolo.com)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-18+-blue.svg)](https://reactjs.org)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A professional-grade, single-user trading alerts system with sub-second latency, real-time market data streaming, and multi-channel notifications.
+A professional-grade, single-user trading alerts system with sub-second latency, real-time market data streaming, multi-channel notifications, and advanced analytics powered by machine learning.
 
 ## 🎯 Overview
 
-TradeAssist is a self-hosted trading alerts application that streams real-time market data from Schwab API and generates actionable alerts with enterprise-grade reliability. Built with an ultra-light single-process architecture optimized for individual traders.
+TradeAssist is a comprehensive self-hosted trading platform that provides real-time market data streaming from Schwab API, advanced analytics, and intelligent alert generation. Built with enterprise-grade reliability and optimized for individual traders requiring professional-level market analysis tools.
 
 ### ⚡ Key Features
-- **Sub-second Alert Latency** - Target <500ms from data to notification
-- **Real-Time Market Data** - Live streaming from Schwab API
-- **Historical Data Foundation** - Complete OHLCV data retrieval and storage system
-- **Multi-Channel Notifications** - In-app, sound, and Slack alerts
-- **Advanced Analytics** - ML-powered market insights and predictions
-- **Professional Dashboard** - React-based responsive interface with data visualization
-- **Enterprise Security** - Google Cloud Secret Manager integration
-- **High Availability** - Circuit breakers and automated recovery
-- **Production Ready** - Comprehensive monitoring, logging, and deployment automation
 
-### 🏗️ Architecture
-- **Backend**: FastAPI with async WebSocket support
-- **Frontend**: React with TypeScript and real-time updates
-- **Database**: SQLite with WAL mode (PostgreSQL ready)
-- **Security**: Google Cloud Secret Manager for credentials
-- **Deployment**: Single-process architecture for minimal complexity
+**🔄 Real-Time Market Data**
+- Live streaming from Schwab API with sub-second latency
+- 12 supported instruments: ES, NQ, YM, CL, GC, SPX, NDX, RUT, VIX, TICK, ADD, TRIN
+- Circuit breaker protection for API reliability
+- Automatic reconnection and failover
+
+**📊 Advanced Analytics Engine**
+- Machine learning-powered market predictions
+- Technical indicators (RSI, MACD, Bollinger Bands, Moving Averages, ATR, Stochastic)
+- Risk metrics and Value-at-Risk calculations
+- Market microstructure analysis
+- Anomaly detection and trend classification
+- Volume profile analysis
+- Stress testing and scenario analysis
+
+**🔔 Multi-Channel Notifications**
+- In-app real-time alerts
+- Sound notifications (pygame-based)
+- Slack integration
+- Customizable alert rules and conditions
+
+**📈 Historical Data Foundation**
+- Complete OHLCV data retrieval and storage
+- Efficient caching and query optimization
+- Data validation and integrity checks
+- Flexible data export (CSV/JSON)
+
+**🎛️ Professional Dashboard**
+- React-based responsive interface
+- Real-time WebSocket updates
+- Interactive charts and visualizations
+- System health monitoring
+- Alert history and management
+
+**🏗️ Enterprise Architecture**
+- FastAPI backend with async WebSocket support
+- SQLite database with WAL mode (PostgreSQL ready)
+- Google Cloud Secret Manager integration
+- Comprehensive logging and monitoring
+- Database performance optimization
+- Production-ready deployment automation
+
+### 🛠️ Tech Stack
+
+**Backend**
+- **Framework**: FastAPI 0.104+ with async support
+- **Database**: SQLite with WAL mode, Alembic migrations
+- **API Integration**: Schwab API via custom package
+- **ML/Analytics**: scikit-learn, TensorFlow, TA-Lib, scipy, statsmodels
+- **Security**: Google Cloud Secret Manager, cryptography
+- **Monitoring**: structlog, psutil, performance metrics
+
+**Frontend** 
+- **Framework**: React 18+ with TypeScript
+- **State Management**: TanStack React Query
+- **Charts**: Chart.js with react-chartjs-2
+- **UI Components**: Custom responsive components
+- **Real-time**: WebSocket integration
+- **Testing**: Jest, React Testing Library
+
+**Infrastructure**
+- **Deployment**: Single-process architecture
+- **Monitoring**: Performance metrics, health checks
+- **Security**: OAuth integration, secure credential management
+- **Development**: Hot reload, comprehensive testing
 
 ## 🚀 Quick Start
 
 ### 1. Prerequisites
 - Python 3.9+
 - Node.js 16+ and npm
-- Google Cloud account
-- Schwab API credentials
+- Schwab API credentials (from [Schwab Developer Portal](https://developer.schwab.com/))
+- Google Cloud account (optional for secret management)
 
 ### 2. Installation & Setup
+
 ```bash
 # Clone repository
 git clone <repository-url>
 cd TradeAssist
 
-# Setup environment
+# Setup Python environment
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate  # Linux/Mac
+# or .venv\Scripts\activate  # Windows
+
+# Install Python dependencies
 pip install -r requirements.txt
+
+# Install frontend dependencies
+cd src/frontend
+npm install
+cd ../..
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your credentials
-
-# Install frontend dependencies
-cd src/frontend && npm install && cd ../..
-
-# Build frontend
-cd src/frontend && npm run build && cd ../..
+# Edit .env with your configuration
 ```
 
-### 3. Run Application
+### 3. Configuration
+
+Create and edit `.env` file:
+
+```env
+# Application Settings
+HOST=127.0.0.1
+PORT=8000
+DEBUG=true
+
+# Database
+DATABASE_URL=sqlite+aiosqlite:///./data/trade_assist.db
+
+# Schwab API (Required)
+SCHWAB_CLIENT_ID=your_schwab_client_id_here
+SCHWAB_CLIENT_SECRET=your_schwab_client_secret_here
+SCHWAB_REDIRECT_URI=http://localhost:8080/callback
+
+# Optional: Google Cloud Secret Manager
+GOOGLE_APPLICATION_CREDENTIALS=path/to/service-account.json
+
+# Notifications (Optional)
+SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
+SLACK_CHANNEL=#trading-alerts
+SOUND_ALERTS_ENABLED=true
+```
+
+### 4. Database Setup
+
 ```bash
-# Quick start (recommended)
+# Database is initialized automatically on first run
+# For manual migrations:
+alembic upgrade head
+```
+
+### 5. Start the Application
+
+#### Option 1: Development Mode (Recommended)
+
+```bash
+# Terminal 1: Start backend
+source .venv/bin/activate
+.venv/bin/uvicorn src.backend.main:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2: Start frontend
+cd src/frontend
+npm run dev
+```
+
+#### Option 2: Quick Start Script
+
+```bash
 chmod +x start.sh
 ./start.sh
-
-# Or manually start backend
-python run.py
-
-# Access dashboard at http://localhost:8000
 ```
 
-## 📚 Documentation
+### 6. Access the Application
 
-### 📖 Essential Guides
-- **[📋 DEPLOYMENT.md](DEPLOYMENT.md)** - Complete deployment and setup guide
-- **[👤 USER_GUIDE.md](USER_GUIDE.md)** - How to use all features and functionality
-- **[⚙️ CONFIGURATION.md](CONFIGURATION.md)** - Comprehensive configuration reference
+- **Frontend Dashboard**: http://localhost:3000 (development)
+- **API Documentation**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/api/health
+- **WebSocket**: ws://localhost:8000/ws/realtime
 
-### 🔧 Developer Resources
-- **[💻 CLAUDE.md](CLAUDE.md)** - Development guidelines and conventions
-- **[🏗️ Architecture Overview](#architecture)** - System design and components
-- **[🧪 Testing Guide](#testing)** - Unit, integration, and performance testing
+## 📖 Documentation
 
-## 🎛️ Core Functionality
+- **[User Guide](USER_GUIDE.md)** - Complete feature walkthrough
+- **[Deployment Guide](DEPLOYMENT.md)** - Production deployment instructions
+- **[Configuration Reference](CONFIGURATION.md)** - Environment variables and settings
+- **[Testing Guide](TESTING_WSL.md)** - Testing procedures and API validation
+- **[Development Guidelines](CLAUDE.md)** - Coding standards and best practices
 
-### Alert System
-- **Price Alerts** - Threshold-based price notifications
-- **Technical Indicators** - RSI, MACD, Moving Averages, Bollinger Bands
-- **Market Conditions** - Volatility, volume, and sentiment alerts
-- **Risk Management** - Position limits and correlation warnings
+## 🏗️ Architecture Overview
 
-### Market Data
-- **Real-Time Streaming** - Sub-second market data updates
-- **Instrument Support** - Futures, stocks, ETFs, options, indices
-- **Historical Data** - Charts and analysis with technical indicators
-- **Data Quality** - Automatic validation and error handling
+```
+TradeAssist/
+├── src/backend/           # FastAPI backend
+│   ├── api/              # REST API endpoints
+│   ├── database/         # Database models and connections
+│   ├── integrations/     # External API integrations (Schwab)
+│   ├── models/           # Data models and schemas
+│   ├── services/         # Business logic services
+│   │   ├── analytics/    # ML and analytics engine
+│   │   └── historical_data/ # Historical data management
+│   └── websocket/        # Real-time WebSocket handlers
+├── src/frontend/         # React frontend
+│   ├── src/components/   # UI components
+│   │   ├── Analytics/    # Analytics dashboard components
+│   │   ├── Dashboard/    # Main dashboard components
+│   │   ├── Health/       # System health components
+│   │   └── common/       # Reusable UI components
+│   ├── hooks/           # Custom React hooks
+│   ├── services/        # API client services
+│   └── types/           # TypeScript definitions
+├── tests/               # Test suites
+├── alembic/            # Database migrations
+└── data/               # Database and data files
+```
 
-### Analytics & ML
-- **Predictive Models** - Price forecasting and volatility prediction
-- **Risk Analysis** - VaR, correlation, and exposure calculations
-- **Market Sentiment** - Fear/greed indicators and market breadth
-- **Performance Tracking** - Alert effectiveness and system metrics
+## 🔌 API Endpoints
 
-## 🔒 Security & Compliance
+### Core Endpoints
+- `GET /api/health` - System health status
+- `GET /api/instruments` - Available trading instruments
+- `GET /api/market-data/{instrument_id}` - Real-time market data
+- `GET /api/alerts` - Alert history
+- `POST /api/rules` - Create alert rules
 
-- **Credential Management** - Google Cloud Secret Manager integration
-- **Data Encryption** - TLS/SSL for all external communications
-- **Access Control** - Single-user authentication and session management
-- **Audit Logging** - Comprehensive activity and error logging
-- **Security Headers** - CORS, HSTS, and CSP protection
+### Analytics Endpoints
+- `POST /api/analytics/market-analysis` - Market analysis
+- `POST /api/analytics/technical-indicators` - Technical indicators
+- `POST /api/analytics/price-prediction` - ML price predictions
+- `POST /api/analytics/risk-metrics` - Risk analysis
+- `POST /api/analytics/volume-profile` - Volume analysis
 
-## 📊 Performance Specifications
-
-- **Alert Latency**: <500ms target (data to notification)
-- **Throughput**: 1000+ alerts per minute processing capacity
-- **Uptime**: 99%+ availability during market hours
-- **Memory**: <2GB RAM typical usage
-- **Storage**: <10GB including historical data
-- **Concurrent Users**: Single-user optimized (extensible)
-
-## 🛠️ Technology Stack
-
-### Backend
-- **FastAPI** - High-performance async web framework
-- **SQLAlchemy** - Database ORM with async support
-- **SQLite/PostgreSQL** - Database with migration support
-- **WebSockets** - Real-time bidirectional communication
-- **Pydantic** - Data validation and settings management
-
-### Frontend  
-- **React 18** - Component-based UI framework with hooks
-- **TypeScript** - Type-safe development
-- **React Query** - Data fetching and caching
-- **Chart.js** - Real-time charting and visualizations
-- **React Router** - Client-side routing
-- **React Toastify** - Toast notifications
-- **WebSocket Client** - Real-time data integration
-- **Responsive Design** - Mobile-friendly interface
-
-### Infrastructure
-- **uvicorn** - ASGI server for production deployment
-- **Alembic** - Database migration management
-- **pytest** - Comprehensive testing framework
-- **Google Cloud** - Secret management and future scaling
+### Historical Data
+- `GET /api/historical-data/query` - Query historical data
+- `GET /api/historical-data/export` - Export data
 
 ## 🧪 Testing
 
 ```bash
-# Run all tests
-source venv_linux/bin/activate
-python -m pytest src/tests/unit/ -v
+# Run backend tests
+source .venv/bin/activate
+.venv/bin/python -m pytest tests/ -v
+
+# Run frontend tests
+cd src/frontend
+npm test
 
 # Run specific test categories
-python -m pytest src/tests/unit/ -m "not slow" -v          # Fast tests only
-python -m pytest src/tests/integration/ -v                 # Integration tests
-python -m pytest src/tests/performance/ -v                 # Performance tests
+pytest tests/unit/ -v           # Unit tests
+pytest tests/integration/ -v    # Integration tests
+pytest tests/performance/ -v    # Performance tests
 
-# Generate coverage report
-python -m pytest src/tests/unit/ --cov=src --cov-report=html
+# Type checking
+cd src/frontend
+npm run typecheck
 ```
 
-## 🔧 Development
+## 🚀 Deployment
 
-### Project Structure
-```
-TradeAssist/
-├── src/
-│   ├── backend/           # FastAPI application
-│   ├── frontend/          # React application
-│   ├── shared/            # Common utilities
-│   └── tests/             # Test suites
-├── DEPLOYMENT.md          # Deployment guide
-├── USER_GUIDE.md          # Feature documentation
-├── CONFIGURATION.md       # Configuration reference
-└── requirements.txt       # Python dependencies
-```
+### Development Deployment
+Suitable for personal use and development:
 
-### Development Commands
 ```bash
-# Backend development
-source .venv/bin/activate
-python run.py
-
-# Frontend development  
-cd src/frontend
-npm run dev
-
-# Run tests
-source .venv/bin/activate
-python -m pytest src/tests/unit/ -v
-
-# Frontend code quality
-cd src/frontend
-npm run lint              # Lint TypeScript
-npm run lint:fix          # Fix lint issues
-npm run format            # Format with Prettier
-npm run typecheck         # TypeScript checking
-
-# Backend code quality (if configured)
-black src/                # Format code
-flake8 src/               # Lint code  
-mypy src/                 # Type checking
+# Start with hot reload
+./start.sh
 ```
 
-## 📈 Roadmap
+### Production Deployment
+For production environments:
 
-### Phase 4 (Future)
-- [ ] Portfolio management integration
-- [ ] Advanced order management
-- [ ] Multi-broker support
-- [ ] Mobile applications
+```bash
+# Build frontend
+cd src/frontend
+npm run build
+cd ../..
 
-### Phase 5 (Future)
-- [ ] Multi-user support
-- [ ] Cloud deployment options
-- [ ] Advanced backtesting
-- [ ] Strategy automation
+# Start production server
+source .venv/bin/activate
+uvicorn src.backend.main:app --host 0.0.0.0 --port 8000 --workers 1
+```
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for comprehensive deployment instructions.
+
+## 🔒 Security Features
+
+- **Secure Credential Management**: Google Cloud Secret Manager integration
+- **API Security**: Rate limiting, request validation, error handling
+- **Circuit Breakers**: Automatic failover and recovery
+- **Data Validation**: Pydantic models for all data structures
+- **Authentication**: OAuth integration for Schwab API
+
+## 📊 Performance Metrics
+
+- **Alert Latency**: <500ms from market data to notification
+- **WebSocket Updates**: <50ms frontend rendering
+- **API Response Time**: <100ms average
+- **Database Queries**: Optimized with indexing and connection pooling
+- **Memory Usage**: <100MB additional browser memory
+- **Bundle Size**: <2MB initial load, <500KB per route
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Follow the development guidelines in `CLAUDE.md`
-4. Ensure tests pass: `python -m pytest src/tests/unit/ -v`
-5. Submit a pull request
-
-## 🆘 Support & Troubleshooting
-
-### Common Issues
-- **Database Errors**: Check `DEPLOYMENT.md` for database setup
-- **API Authentication**: Verify Schwab credentials in `CONFIGURATION.md`
-- **WebSocket Issues**: Review firewall and proxy settings
-- **Performance**: See optimization tips in `USER_GUIDE.md`
-
-### Getting Help
-1. Check the **[USER_GUIDE.md](USER_GUIDE.md)** for usage questions
-2. Review **[CONFIGURATION.md](CONFIGURATION.md)** for setup issues
-3. Examine logs in `logs/tradeassist.log`
-4. Use the health endpoint: `http://localhost:8000/api/health`
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## 🆘 Support
 
-- Built with the Complex PRP Framework for systematic development
-- Powered by Schwab API for real-time market data
-- Designed for individual traders requiring professional-grade tools
+- **Issues**: Report bugs and request features via GitHub Issues
+- **Documentation**: Check the comprehensive documentation in this repository
+- **Schwab API**: Refer to [Schwab Developer Documentation](https://developer.schwab.com/docs)
+
+## 🎯 Roadmap
+
+**✅ Completed Phases**
+- Phase 1: Core Infrastructure & Real-time Data
+- Phase 2: Advanced Analytics & Machine Learning  
+- Phase 3: Multi-Channel Notifications & Enterprise Features
+- Phase 4: Production Monitoring & Advanced Analytics
+
+**🔮 Future Enhancements**
+- Multi-user support with user authentication
+- Advanced portfolio management features
+- Additional broker integrations
+- Enhanced mobile responsive design
+- Cloud deployment options
 
 ---
 
-## ✨ Ready to Start Trading?
-
-1. **Deploy** using the [DEPLOYMENT.md](DEPLOYMENT.md) guide
-2. **Configure** your settings with [CONFIGURATION.md](CONFIGURATION.md)
-3. **Learn** the features in [USER_GUIDE.md](USER_GUIDE.md)
-4. **Start** receiving real-time trading alerts!
-
-**Transform your trading with professional-grade alerts and sub-second market insights!**
+**⚡ Ready for professional trading with sub-second alerts and advanced analytics!**
