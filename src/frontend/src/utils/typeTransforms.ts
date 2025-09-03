@@ -100,6 +100,11 @@ export function normalizeDateTimeFields(
     return obj;
   }
 
+  // Handle arrays by applying normalization to each item
+  if (Array.isArray(obj)) {
+    return obj.map(item => normalizeDateTimeFields(item, dateFields));
+  }
+
   const commonDateFields = [
     'createdAt', 'updatedAt', 'timestamp', 'lastTick', 'lastTriggered',
     'deliveryAttemptedAt', 'deliveryCompletedAt', 'created_at', 'updated_at',

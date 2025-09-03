@@ -130,14 +130,15 @@ class TradeAssistSchwabClient:
         self._start_time = datetime.utcnow()
         self.is_streaming = True
         
-        # Stream indefinitely with auto-reconnect
-        await self.client.stream_quotes(
+        # Start streaming in background task - don't await it
+        asyncio.create_task(self.client.stream_quotes(
             symbols=symbols,
             callback=tracked_callback,
             duration=None,  # Indefinite
             auto_reconnect=True
-        )
+        ))
         
+        # Return immediately to avoid circuit breaker timeout
         return True
     
     async def start_streaming(self, symbols: List[str]) -> bool:

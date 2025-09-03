@@ -5,7 +5,7 @@
  * with optimized rendering and data management.
  */
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect } from 'react';
 import { useWebSocket } from './useWebSocket';
 import { 
   Instrument, 
@@ -49,6 +49,8 @@ export interface UseRealTimeDataReturn {
   connect: () => void;
   disconnect: () => void;
   sendMessage: (message: OutgoingMessage) => void;
+  subscribe: (subscriptionType: string, instrumentId?: number, parameters?: Record<string, any>) => void;
+  unsubscribe: (subscriptionType: string, instrumentId?: number) => void;
 }
 
 export const useRealTimeData = (options: UseRealTimeDataOptions = {}): UseRealTimeDataReturn => {
@@ -67,7 +69,9 @@ export const useRealTimeData = (options: UseRealTimeDataOptions = {}): UseRealTi
     systemHealth,
     connect,
     disconnect,
-    sendMessage
+    sendMessage,
+    subscribe,
+    unsubscribe
   } = useWebSocket();
 
   // =============================================================================
@@ -141,7 +145,9 @@ export const useRealTimeData = (options: UseRealTimeDataOptions = {}): UseRealTi
     // Actions
     connect,
     disconnect,
-    sendMessage
+    sendMessage,
+    subscribe,
+    unsubscribe
   };
 };
 
@@ -153,12 +159,40 @@ export const useRealTimeData = (options: UseRealTimeDataOptions = {}): UseRealTi
  * Hook for monitoring specific instruments with real-time price updates
  */
 export const useInstrumentWatch = (instruments: Instrument[]) => {
-  const instrumentIds = instruments.map(i => i.id);
   
-  const { realtimeData, getLatestPrice, isConnected } = useRealTimeData({
-    instrumentIds,
-    enableHealthMonitoring: false
-  });
+  // Use WebSocket directly to avoid circular dependencies
+  const { 
+    realtimeData, 
+    isConnected, 
+    subscribe,
+    unsubscribe 
+  } = useWebSocket();
+
+  // Subscribe to market data for all instruments when connected
+  useEffect(() => {
+    if (isConnected && instruments.length > 0) {
+      console.log(`Subscribing to market data for ${instruments.length} instruments:`, instruments.map(i => i.symbol));
+      
+      // Subscribe to market data for each instrument
+      instruments.forEach(instrument => {
+        subscribe('market_data', instrument.id);
+      });
+    }
+
+    // Cleanup subscriptions when instruments change or component unmounts
+    return () => {
+      if (isConnected && instruments.length > 0) {
+        instruments.forEach(instrument => {
+          unsubscribe('market_data', instrument.id);
+        });
+      }
+    };
+  }, [isConnected, instruments, subscribe, unsubscribe]);
+
+  const getLatestPrice = useCallback((instrumentId: number): number | null => {
+    const data = realtimeData[instrumentId];
+    return data?.price || null;
+  }, [realtimeData]);
 
   const instrumentsWithPrices = useMemo(() => {
     return instruments.map(instrument => ({

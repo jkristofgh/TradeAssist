@@ -20,6 +20,7 @@ from .api.alerts import router as alerts_router
 from .api.analytics import router as analytics_router
 from .api.auth import router as auth_router
 from .api.historical_data import router as historical_data_router, set_historical_data_service
+from .api.test_market_data import router as test_market_data_router
 from .config import settings
 from .database.connection import init_database, close_database
 from .services.data_ingestion import DataIngestionService
@@ -160,6 +161,7 @@ def create_app() -> FastAPI:
     app.include_router(analytics_router, tags=["analytics"])
     app.include_router(auth_router, tags=["authentication"])
     app.include_router(historical_data_router, prefix="/api/historical-data", tags=["historical-data"])
+    app.include_router(test_market_data_router, prefix="/api/test", tags=["testing"])
     
     # Include WebSocket router
     app.include_router(websocket_router, prefix="/ws")

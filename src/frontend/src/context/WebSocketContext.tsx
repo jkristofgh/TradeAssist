@@ -150,6 +150,7 @@ function websocketReducer(state: WebSocketContextState, action: WebSocketAction)
       
       // Route message to appropriate state
       if (isMarketDataMessage(message)) {
+        console.log('📊 Market data message received:', message.data);
         const tickData = message.data;
         const marketData: MarketData = {
           id: Date.now(),
@@ -169,6 +170,7 @@ function websocketReducer(state: WebSocketContextState, action: WebSocketAction)
           ...newState.realtimeData,
           [tickData.instrumentId]: marketData
         };
+        console.log('✅ Updated real-time data for instrument', tickData.instrumentId, 'price:', tickData.price);
       }
       
       else if (isAnalyticsMessage(message)) {
@@ -221,9 +223,21 @@ function websocketReducer(state: WebSocketContextState, action: WebSocketAction)
       }
       
       else if (isConnectionMessage(message)) {
-        // Update connection status if needed
-        if (message.data.clientId && message.data.clientId !== newState.clientId) {
-          newState.clientId = message.data.clientId;
+        // Update connection status and extract client ID
+        if (message.data.clientId) {
+          console.log('🔗 Connection message received:', message.data);
+          // Dispatch a separate CONNECT action to properly update state
+          return {
+            ...newState,
+            isConnected: true,
+            error: null,
+            reconnectAttempts: 0,
+            clientId: message.data.clientId,
+            performanceMetrics: {
+              ...newState.performanceMetrics,
+              connectionQuality: 'good'
+            }
+          };
         }
       }
       
@@ -361,6 +375,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           if (ws.readyState === WebSocket.OPEN) {
             const pingMessage = createPingMessage(Date.now());
             ws.send(JSON.stringify(pingMessage));
+          } else {
+            // Clear ping interval if connection is not open
+            if (pingIntervalRef.current) {
+              clearInterval(pingIntervalRef.current);
+              pingIntervalRef.current = null;
+            }
           }
         }, 30000); // Ping every 30 seconds
       };
@@ -386,6 +406,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
           }, delay);
+        } else if (state.reconnectAttempts >= maxReconnectAttempts) {
+          console.error('Max reconnection attempts reached');
+          dispatch({ type: 'ERROR', payload: 'Max reconnection attempts reached' });
         }
       };
 
@@ -398,7 +421,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       console.error('Failed to create WebSocket connection:', error);
       dispatch({ type: 'ERROR', payload: 'Failed to create WebSocket connection' });
     }
-  }, [wsUrl, handleMessage, state.reconnectAttempts, maxReconnectAttempts, reconnectInterval]);
+  }, [wsUrl, handleMessage, maxReconnectAttempts, reconnectInterval]); // Removed state.reconnectAttempts dependency
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -494,6 +517,22 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     };
   }, []); // Only run on mount/unmount
 
+  // Auto-retry logic for connection failures
+  useEffect(() => {
+    if (state.error && !state.isConnected && state.reconnectAttempts < maxReconnectAttempts) {
+      const retryDelay = Math.min(reconnectInterval * Math.pow(2, state.reconnectAttempts), 30000);
+      
+      console.log(`Auto-retrying connection in ${retryDelay}ms (attempt ${state.reconnectAttempts + 1})`);
+      
+      const retryTimeout = setTimeout(() => {
+        dispatch({ type: 'RECONNECTING' });
+        connect();
+      }, retryDelay);
+      
+      return () => clearTimeout(retryTimeout);
+    }
+  }, [state.error, state.isConnected, state.reconnectAttempts, maxReconnectAttempts, reconnectInterval, connect]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -505,15 +544,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   // CONTEXT VALUE
   // =============================================================================
   
-  // Handle connection messages to extract client ID
-  useEffect(() => {
-    if (isValidIncomingMessage(state) && isConnectionMessage(state)) {
-      const clientId = state.data.clientId;
-      if (clientId && clientId !== state.clientId) {
-        dispatch({ type: 'CONNECT', payload: { clientId } });
-      }
-    }
-  }, [state]);
+  // Connection establishment logic is now handled in the message reducer
+  // when connection_status messages are received
   
   const contextValue: WebSocketContextValue = {
     ...state,

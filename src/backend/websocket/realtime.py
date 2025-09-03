@@ -47,6 +47,7 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}  # client_id -> websocket
         self.client_subscriptions: Dict[str, Set[str]] = {}  # client_id -> subscription types
+        self.client_heartbeats: Dict[str, datetime] = {}  # client_id -> last heartbeat
         self.connection_count = 0
         self.max_connections = settings.MAX_WEBSOCKET_CONNECTIONS
         self.message_handler = MessageHandler()
@@ -55,16 +56,20 @@ class ConnectionManager:
             "broadcast_times": [],
             "average_broadcast_time": 0.0
         }
+        self.heartbeat_interval = 30  # seconds
+        self.heartbeat_timeout = 90   # seconds
+        self._heartbeat_task = None
     
     async def connect(self, websocket: WebSocket, client_id: Optional[str] = None) -> tuple[bool, str]:
         """
-        Accept new WebSocket connection.
+        Accept new WebSocket connection with improved stability.
         
         Args:
             websocket: WebSocket connection to accept.
-        
+            client_id: Optional client ID for the connection.
+
         Returns:
-            bool: True if connection accepted, False if at capacity.
+            tuple[bool, str]: (success, client_id)
         """
         if len(self.active_connections) >= self.max_connections:
             logger.warning(f"WebSocket connection rejected: at capacity ({self.max_connections})")
@@ -74,39 +79,47 @@ class ConnectionManager:
         if not client_id:
             client_id = f"client_{self.connection_count + 1}_{int(time.time())}"
         
-        await websocket.accept()
-        self.active_connections[client_id] = websocket
-        self.client_subscriptions[client_id] = set()
-        self.connection_count += 1
-        
-        logger.info(f"WebSocket connection accepted for {client_id}. Active connections: {len(self.active_connections)}")
-        
-        # Send typed welcome message
-        welcome_message = ConnectionMessage(
-            data=ConnectionStatus(
-                client_id=client_id,
-                connected_at=datetime.utcnow(),
-                subscriptions=[],
-                last_heartbeat=datetime.utcnow(),
-                connection_quality="good"
-            )
-        )
-        
-        # Convert ConnectionMessage to dict for JSON serialization
-        welcome_dict = {
-            "type": "connection",
-            "data": {
-                "client_id": client_id,
-                "connected_at": datetime.utcnow().isoformat(),
-                "subscriptions": [],
-                "last_heartbeat": datetime.utcnow().isoformat(),
-                "connection_quality": "good"
+        try:
+            await websocket.accept()
+            self.active_connections[client_id] = websocket
+            self.client_subscriptions[client_id] = set()
+            self.connection_count += 1
+            
+            logger.info(f"WebSocket connection accepted for {client_id}. Active connections: {len(self.active_connections)}")
+            
+            # Send welcome message in the format expected by frontend
+            welcome_message = {
+                "messageType": "connection_status",  # Frontend expects messageType, not type
+                "version": "1.0",
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": {
+                    "clientId": client_id,
+                    "connectedAt": datetime.utcnow().isoformat(),
+                    "subscriptions": [],
+                    "lastHeartbeat": datetime.utcnow().isoformat(),
+                    "connectionQuality": "good"
+                }
             }
-        }
-        
-        await self.send_personal_message(websocket, welcome_dict)
-        
-        return True, client_id
+            
+            await self.send_personal_message(websocket, welcome_message)
+            
+            # Initialize heartbeat tracking
+            self.client_heartbeats[client_id] = datetime.utcnow()
+            
+            # Start heartbeat monitoring task if not already running
+            if self._heartbeat_task is None or self._heartbeat_task.done():
+                self._heartbeat_task = asyncio.create_task(self._heartbeat_monitor())
+            
+            return True, client_id
+            
+        except Exception as e:
+            logger.error(f"Failed to establish WebSocket connection: {e}")
+            # Clean up partial connection state
+            if client_id in self.active_connections:
+                del self.active_connections[client_id]
+            if client_id in self.client_subscriptions:
+                del self.client_subscriptions[client_id]
+            return False, ""
     
     def disconnect(self, client_id: str) -> None:
         """
@@ -119,6 +132,8 @@ class ConnectionManager:
             del self.active_connections[client_id]
         if client_id in self.client_subscriptions:
             del self.client_subscriptions[client_id]
+        if client_id in self.client_heartbeats:
+            del self.client_heartbeats[client_id]
         logger.info(f"Client {client_id} disconnected. Active connections: {len(self.active_connections)}")
     
     def disconnect_websocket(self, websocket: WebSocket) -> None:
@@ -136,548 +151,240 @@ class ConnectionManager:
         if client_id:
             self.disconnect(client_id)
     
-    async def send_personal_message(self, websocket: WebSocket, message: dict) -> None:
+    async def send_personal_message(self, websocket: WebSocket, message: dict) -> bool:
         """
-        Send message to specific WebSocket connection.
+        Send message to specific WebSocket connection with improved error handling.
         
         Args:
             websocket: Target WebSocket connection.
             message: Message to send.
+            
+        Returns:
+            bool: True if message sent successfully, False otherwise.
         """
         try:
-            await websocket.send_text(json.dumps(message, default=str))
+            json_message = json.dumps(message, default=str)
+            await websocket.send_text(json_message)
+            return True
         except Exception as e:
             logger.warning(f"Failed to send personal message: {e}")
             self.disconnect_websocket(websocket)
+            return False
     
-    async def broadcast(self, message: dict) -> None:
+    async def broadcast(self, message: dict) -> int:
         """
-        Broadcast message to all active connections.
+        Broadcast message to all active connections with improved stability.
         
         Args:
             message: Message to broadcast.
+            
+        Returns:
+            int: Number of successful broadcasts.
         """
         if not self.active_connections:
-            return
+            return 0
         
         # Create JSON message once for efficiency
         json_message = json.dumps(message, default=str)
         
         # Send to all connections, remove failed ones
-        disconnected_connections = set()
+        disconnected_clients = set()
+        successful_sends = 0
         
-        for connection in self.active_connections.copy():
+        for client_id, websocket in self.active_connections.copy().items():
             try:
-                await connection.send_text(json_message)
+                await websocket.send_text(json_message)
+                successful_sends += 1
             except Exception as e:
-                logger.warning(f"Failed to broadcast to connection: {e}")
-                disconnected_connections.add(connection)
+                logger.warning(f"Failed to broadcast to {client_id}: {e}")
+                disconnected_clients.add(client_id)
         
-        # Remove failed connections
-        for connection in disconnected_connections:
-            self.disconnect(connection)
+        # Batch cleanup failed connections
+        if disconnected_clients:
+            for client_id in disconnected_clients:
+                self.disconnect(client_id)
+            logger.info(f"Cleaned up {len(disconnected_clients)} failed connections")
         
-        if disconnected_connections:
-            logger.info(f"Removed {len(disconnected_connections)} failed connections")
-    
-    async def broadcast_tick_update(
-        self, 
-        instrument_id: int, 
-        symbol: str, 
-        price: float, 
-        volume: int, 
-        timestamp: datetime,
-        bid: Optional[float] = None,
-        ask: Optional[float] = None,
-        change_percent: Optional[float] = None
-    ) -> None:
-        """
-        Broadcast typed market tick update.
+        # Update performance metrics
+        self.performance_metrics["messages_sent"] += successful_sends
         
-        Args:
-            instrument_id: Instrument ID.
-            symbol: Instrument symbol.
-            price: Current price.
-            volume: Trade volume.
-            timestamp: Tick timestamp.
-            bid: Bid price (optional).
-            ask: Ask price (optional).
-            change_percent: Price change percentage (optional).
-        """
-        message = MarketDataMessage(
-            data=MarketDataUpdate(
-                instrument_id=instrument_id,
-                symbol=symbol,
-                price=price,
-                volume=volume,
-                timestamp=timestamp,
-                bid=bid,
-                ask=ask,
-                change_percent=change_percent
-            )
-        )
-        await self.broadcast_message(message, "market_data")
-    
-    async def broadcast_alert_fired(
-        self,
-        alert_id: int,
-        rule_id: int,
-        instrument_id: int,
-        symbol: str,
-        rule_name: str,
-        trigger_value: float,
-        threshold_value: float,
-        condition: str,
-        timestamp: datetime,
-        evaluation_time_ms: Optional[int] = None,
-        severity: str = "medium",
-        message_text: str = "Alert condition triggered"
-    ) -> None:
-        """
-        Broadcast typed alert firing notification.
-        
-        Args:
-            alert_id: Alert ID.
-            rule_id: Rule ID that fired.
-            instrument_id: Instrument ID.
-            symbol: Instrument symbol.
-            rule_name: Name of the rule.
-            trigger_value: Value that triggered the alert.
-            threshold_value: Threshold from the rule.
-            condition: Rule condition.
-            timestamp: Alert timestamp.
-            evaluation_time_ms: Rule evaluation time.
-            severity: Alert severity level.
-            message_text: Alert message text.
-        """
-        message = AlertMessage(
-            data=AlertNotification(
-                alert_id=alert_id,
-                rule_id=rule_id,
-                instrument_id=instrument_id,
-                symbol=symbol,
-                rule_name=rule_name,
-                condition=condition,
-                target_value=threshold_value,
-                current_value=trigger_value,
-                severity=severity,
-                message=message_text,
-                evaluation_time_ms=evaluation_time_ms,
-                rule_condition=condition
-            )
-        )
-        await self.broadcast_message(message, "alerts")
-    
-    async def broadcast_health_status(self, status: dict) -> None:
-        """
-        Broadcast system health status (legacy method).
-        
-        Args:
-            status: Health status data.
-        """
-        message = {
-            "type": "health_status",
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": status
-        }
-        await self.broadcast(message)
-        
-    async def broadcast_analytics_update(
-        self,
-        instrument_id: int,
-        symbol: str,
-        analysis_type: str,
-        results: Dict[str, Any],
-        confidence_score: Optional[float] = None
-    ) -> None:
-        """
-        Broadcast typed analytics update.
-        
-        Args:
-            instrument_id: Instrument ID.
-            symbol: Instrument symbol.
-            analysis_type: Type of analysis.
-            results: Analysis results.
-            confidence_score: Analysis confidence score.
-        """
-        message = AnalyticsMessage(
-            data=AnalyticsUpdate(
-                instrument_id=instrument_id,
-                symbol=symbol,
-                analysis_type=analysis_type,
-                results=results,
-                calculation_time=datetime.utcnow(),
-                confidence_score=confidence_score
-            )
-        )
-        await self.broadcast_message(message, f"analytics_{instrument_id}")
-    
-    async def broadcast_technical_indicators(
-        self,
-        instrument_id: int,
-        symbol: str,
-        indicators: Dict[str, Any],
-        timeframe: str = "1min"
-    ) -> None:
-        """
-        Broadcast typed technical indicator update.
-        
-        Args:
-            instrument_id: Instrument ID.
-            symbol: Instrument symbol.
-            indicators: Technical indicators data.
-            timeframe: Analysis timeframe.
-        """
-        message = TechnicalIndicatorMessage(
-            data=TechnicalIndicatorUpdate(
-                instrument_id=instrument_id,
-                symbol=symbol,
-                indicators=indicators,
-                calculated_at=datetime.utcnow(),
-                timeframe=timeframe
-            )
-        )
-        await self.broadcast_message(message, f"technical_indicators_{instrument_id}")
-    
-    async def broadcast_rule_triggered(self, rule_id: int, match_details: dict, evaluation_time: int) -> None:
-        """
-        Broadcast rule trigger notification.
-        
-        Args:
-            rule_id: Rule ID that triggered.
-            match_details: Rule match details.
-            evaluation_time: Evaluation time in milliseconds.
-        """
-        message = {
-            "type": "rule_triggered",
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": {
-                "rule_id": rule_id,
-                "match_details": match_details,
-                "evaluation_time": evaluation_time
-            }
-        }
-        await self.broadcast(message)
+        return successful_sends
 
-    # Phase 3: Historical Data WebSocket Integration
-    
-    async def broadcast_historical_data_progress(
-        self,
-        query_id: str,
-        symbol: str,
-        progress_percent: float,
-        current_step: str,
-        estimated_completion: Optional[datetime] = None
-    ) -> None:
-        """Broadcast progress updates for historical data queries."""
+    async def broadcast_tick_update(self, instrument_id: int, symbol: str, price: float, volume: float = 0, bid: float = None, ask: float = None, timestamp: str = None) -> int:
+        """
+        Broadcast market data tick update to all connected clients.
         
-        message = WebSocketMessage(
-            type="historical_data_progress",
-            timestamp=datetime.now(),
-            data={
-                "query_id": query_id,
+        Args:
+            instrument_id: The instrument identifier
+            symbol: The trading symbol
+            price: Current price
+            volume: Trading volume (default: 0)
+            bid: Bid price (optional)
+            ask: Ask price (optional)
+            timestamp: Market data timestamp (optional)
+            
+        Returns:
+            int: Number of successful broadcasts
+        """
+        if not self.active_connections:
+            return 0
+            
+        # Create market data message in expected format
+        current_timestamp = timestamp or datetime.utcnow().isoformat()
+        tick_message = {
+            "messageType": "market_data",
+            "version": "1.0", 
+            "timestamp": current_timestamp,
+            "data": {
+                "instrumentId": instrument_id,
                 "symbol": symbol,
-                "progress_percent": progress_percent,
-                "current_step": current_step,
-                "estimated_completion": estimated_completion.isoformat() if estimated_completion else None,
-                "status": "in_progress"
+                "price": price,
+                "volume": volume,
+                "timestamp": current_timestamp,
+                "bid": bid,
+                "ask": ask,
+                "changePercent": None  # Calculate if needed
             }
-        )
+        }
         
-        await self.broadcast(message)
-        
-        logger.debug(f"Historical data progress broadcasted: {symbol} {progress_percent}%")
-    
-    async def broadcast_historical_data_complete(
-        self,
-        query_id: str,
-        symbol: str,
-        bars_retrieved: int,
-        execution_time_ms: float,
-        cache_hit: bool = False
-    ) -> None:
-        """Broadcast completion of historical data query."""
-        
-        message = WebSocketMessage(
-            type="historical_data_complete",
-            timestamp=datetime.now(),
-            data={
-                "query_id": query_id,
-                "symbol": symbol,
-                "bars_retrieved": bars_retrieved,
-                "execution_time_ms": execution_time_ms,
-                "cache_hit": cache_hit,
-                "status": "complete"
-            }
-        )
-        
-        await self.broadcast(message)
-        
-        logger.info(f"Historical data query completed: {symbol} - {bars_retrieved} bars")
-    
-    async def broadcast_historical_data_error(
-        self,
-        query_id: str,
-        symbol: str,
-        error_message: str,
-        error_type: str = "general"
-    ) -> None:
-        """Broadcast historical data query error."""
-        
-        message = WebSocketMessage(
-            type="historical_data_error",
-            timestamp=datetime.now(),
-            data={
-                "query_id": query_id,
-                "symbol": symbol,
-                "error_message": error_message,
-                "error_type": error_type,
-                "status": "error"
-            }
-        )
-        
-        await self.broadcast(message)
-        
-        logger.error(f"Historical data query error broadcasted: {symbol} - {error_message}")
-    
-    async def broadcast_aggregation_progress(
-        self,
-        aggregation_id: str,
-        symbol: str,
-        source_frequency: str,
-        target_frequency: str,
-        progress_percent: float
-    ) -> None:
-        """Broadcast progress updates for data aggregation operations."""
-        
-        message = WebSocketMessage(
-            type="aggregation_progress",
-            timestamp=datetime.now(),
-            data={
-                "aggregation_id": aggregation_id,
-                "symbol": symbol,
-                "source_frequency": source_frequency,
-                "target_frequency": target_frequency,
-                "progress_percent": progress_percent,
-                "status": "aggregating"
-            }
-        )
-        
-        await self.broadcast(message)
-        
-        logger.debug(f"Aggregation progress: {symbol} {source_frequency}→{target_frequency} {progress_percent}%")
-    
-    async def broadcast_aggregation_complete(
-        self,
-        aggregation_id: str,
-        symbol: str,
-        source_frequency: str,
-        target_frequency: str,
-        source_bars: int,
-        target_bars: int,
-        execution_time_ms: float
-    ) -> None:
-        """Broadcast completion of data aggregation."""
-        
-        message = WebSocketMessage(
-            type="aggregation_complete",
-            timestamp=datetime.now(),
-            data={
-                "aggregation_id": aggregation_id,
-                "symbol": symbol,
-                "source_frequency": source_frequency,
-                "target_frequency": target_frequency,
-                "source_bars": source_bars,
-                "target_bars": target_bars,
-                "compression_ratio": round(target_bars / source_bars if source_bars > 0 else 0, 2),
-                "execution_time_ms": execution_time_ms,
-                "status": "complete"
-            }
-        )
-        
-        await self.broadcast(message)
-        
-        logger.info(f"Aggregation completed: {symbol} {source_bars}→{target_bars} bars in {execution_time_ms}ms")
-    
-    async def broadcast_cache_performance_update(
-        self,
-        cache_hit_rate: float,
-        total_requests: int,
-        redis_available: bool
-    ) -> None:
-        """Broadcast cache performance metrics for monitoring."""
-        
-        message = WebSocketMessage(
-            type="cache_performance",
-            timestamp=datetime.now(),
-            data={
-                "cache_hit_rate": cache_hit_rate,
-                "total_requests": total_requests,
-                "redis_available": redis_available,
-                "status": "healthy" if cache_hit_rate > 50 else "degraded"
-            }
-        )
-        
-        await self.broadcast(message)
-        
-        logger.debug(f"Cache performance update: {cache_hit_rate}% hit rate")
+        return await self.broadcast(tick_message)
 
-    
-    async def broadcast_database_performance(self, performance_data: Dict[str, Any]) -> None:
+    async def broadcast_database_performance(self, metrics: dict) -> int:
         """
-        Broadcast real-time database performance metrics to all connected clients.
+        Broadcast database performance metrics to all connected clients.
         
         Args:
-            performance_data: Database performance metrics including connection pool,
-                            INSERT rates, query performance, and partition health.
+            metrics: Performance metrics dictionary
+            
+        Returns:
+            int: Number of successful broadcasts
         """
-        message = {
-            "type": "database_performance",
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": {
-                "connection_pool": performance_data.get("connection_pool", {}),
-                "performance_metrics": performance_data.get("performance_metrics", {}),
-                "partition_health": performance_data.get("partition_health", {}),
-                "alerts": performance_data.get("alerts", []),
-                "overall_status": performance_data.get("status", "unknown")
-            }
+        if not self.active_connections:
+            return 0
+            
+        performance_message = {
+            "messageType": "database_performance",
+            "version": "1.0",
+            "timestamp": datetime.utcnow().isoformat(), 
+            "data": metrics
         }
         
-        await self.broadcast(message)
-        logger.debug("Broadcasted database performance update", 
-                    active_connections=self.connection_count,
-                    status=performance_data.get("status"))
-    
-    async def broadcast_performance_alert(self, alert_type: str, message: str, 
-                                        severity: str = "warning") -> None:
+        return await self.broadcast(performance_message)
+
+    async def handle_client_message(self, websocket: WebSocket, client_id: str, message: dict) -> None:
         """
-        Broadcast performance-related alerts to connected clients.
+        Handle incoming messages from WebSocket clients.
         
         Args:
-            alert_type: Type of performance alert (connection_pool, slow_query, etc.)
-            message: Alert message description
-            severity: Alert severity level (info, warning, critical)
+            websocket: The WebSocket connection
+            client_id: The client identifier
+            message: The parsed message dictionary
         """
-        alert_message = {
-            "type": "performance_alert",
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": {
-                "alert_type": alert_type,
-                "message": message,
-                "severity": severity,
-                "source": "database_performance"
-            }
-        }
-        
-        await self.broadcast(alert_message)
-        logger.info(f"Broadcasted performance alert: {alert_type}", 
-                   message=message, severity=severity)
-    
-    async def broadcast_partition_status_update(self, partition_data: Dict[str, Any]) -> None:
-        """
-        Broadcast partition status updates to connected clients.
-        
-        Args:
-            partition_data: Partition status information including health,
-                          storage utilization, and maintenance status.
-        """
-        message = {
-            "type": "partition_status",
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": {
-                "service_status": partition_data.get("service_status", "unknown"),
-                "partitions": partition_data.get("partitions", {}),
-                "health_summary": partition_data.get("health_summary", {}),
-                "config": partition_data.get("config", {}),
-                "recent_activity": partition_data.get("recent_activity", [])
-            }
-        }
-        
-        await self.broadcast(message)
-        logger.debug("Broadcasted partition status update", 
-                    total_partitions=partition_data.get("health_summary", {}).get("total_partitions", 0))
-    
-    async def broadcast_performance_benchmark_results(self, benchmark_data: Dict[str, Any]) -> None:
-        """
-        Broadcast performance benchmark test results to connected clients.
-        
-        Args:
-            benchmark_data: Performance benchmark results including INSERT rates,
-                          calculation speedup, and capacity validation.
-        """
-        message = {
-            "type": "performance_benchmark",
-            "timestamp": datetime.utcnow().isoformat(),
-            "data": {
-                "insert_performance": benchmark_data.get("insert_performance", {}),
-                "calculation_performance": benchmark_data.get("calculation_performance", {}),
-                "capacity_test": benchmark_data.get("capacity_test", {}),
-                "baseline_comparison": benchmark_data.get("baseline_comparison", {}),
-                "test_status": benchmark_data.get("test_status", "unknown")
-            }
-        }
-        
-        await self.broadcast(message)
-        logger.info("Broadcasted performance benchmark results", 
-                   test_status=benchmark_data.get("test_status"))
-    
-    async def send_historical_data_stream(
-        self,
-        client_id: str,
-        query_id: str,
-        symbol: str,
-        bars_data: List[Dict[str, Any]],
-        chunk_size: int = 100
-    ) -> None:
-        """Stream historical data in chunks to a specific WebSocket connection."""
-        
         try:
-            total_bars = len(bars_data)
-            chunks_sent = 0
+            message_type = message.get("messageType", message.get("type", ""))  # Support both formats
             
-            # Send data in chunks to prevent overwhelming the connection
-            for i in range(0, total_bars, chunk_size):
-                chunk = bars_data[i:i + chunk_size]
-                chunk_number = chunks_sent + 1
-                total_chunks = (total_bars + chunk_size - 1) // chunk_size
+            if message_type == "ping":
+                # Update heartbeat timestamp
+                self.client_heartbeats[client_id] = datetime.utcnow()
                 
-                # Use legacy WebSocketMessage for historical data chunks
-                message = WebSocketMessage(
-                    type="historical_data_chunk",
-                    timestamp=datetime.now(),
-                    data={
-                        "query_id": query_id,
-                        "symbol": symbol,
-                        "chunk_number": chunk_number,
-                        "total_chunks": total_chunks,
-                        "bars": chunk,
-                        "is_final_chunk": chunk_number == total_chunks
+                # Respond to ping with pong
+                pong_message = {
+                    "messageType": "pong",
+                    "version": "1.0",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "data": {
+                        "clientTime": message.get("data", {}).get("clientTime", datetime.utcnow().isoformat()),
+                        "serverTime": datetime.utcnow().isoformat(),
+                        "sequence": message.get("data", {}).get("sequence"),
+                        "latencyMs": 0  # Calculate if needed
                     }
-                )
-                
-                # Convert to dict for legacy send method
-                message_dict = {
-                    "type": message.type,
-                    "timestamp": message.timestamp.isoformat(),
-                    "data": message.data
                 }
+                await self.send_personal_message(websocket, pong_message)
                 
-                if client_id in self.active_connections:
-                    websocket = self.active_connections[client_id]
-                    await websocket.send_text(json.dumps(message_dict, default=str))
+            elif message_type == "subscribe":
+                # Handle subscription requests
+                data = message.get("data", {})
+                subscription_type = data.get("subscriptionType", "")
+                instrument_id = data.get("instrumentId")
+                request_id = data.get("requestId", f"req_{int(time.time())}")
                 
-                chunks_sent += 1
+                if client_id not in self.client_subscriptions:
+                    self.client_subscriptions[client_id] = set()
                 
-                # Small delay to prevent overwhelming the client
-                await asyncio.sleep(0.01)
-            
-            logger.info(f"Streamed {total_bars} bars in {chunks_sent} chunks for {symbol}")
-            
+                subscription_key = f"{subscription_type}_{instrument_id}" if instrument_id else subscription_type
+                self.client_subscriptions[client_id].add(subscription_key)
+                
+                # Send subscription acknowledgment
+                response = {
+                    "messageType": "subscription_ack",
+                    "version": "1.0",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "data": {
+                        "subscriptionType": subscription_type,
+                        "instrumentId": instrument_id,
+                        "status": "subscribed",
+                        "requestId": request_id
+                    }
+                }
+                await self.send_personal_message(websocket, response)
+                
+            else:
+                # Unknown message type
+                error_response = {
+                    "messageType": "error",
+                    "version": "1.0",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "data": {
+                        "errorCode": "UNKNOWN_MESSAGE_TYPE",
+                        "errorMessage": f"Unknown message type: {message_type}",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "severity": "warning"
+                    }
+                }
+                await self.send_personal_message(websocket, error_response)
+                
         except Exception as e:
-            logger.error(f"Error streaming historical data for {symbol}: {e}")
-            await self.broadcast_historical_data_error(
-                query_id, symbol, f"Streaming error: {str(e)}", "streaming_error"
-            )
+            logger.error(f"Error handling client message from {client_id}: {e}")
+            error_response = {
+                "messageType": "error",
+                "version": "1.0",
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": {
+                    "errorCode": "MESSAGE_HANDLING_ERROR",
+                    "errorMessage": str(e),
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "severity": "error"
+                }
+            }
+            await self.send_personal_message(websocket, error_response)
+
+    async def _heartbeat_monitor(self):
+        """
+        Monitor client heartbeats and disconnect stale connections.
+        This runs as a background task to maintain connection health.
+        """
+        while self.active_connections:
+            try:
+                now = datetime.utcnow()
+                stale_clients = []
+                
+                for client_id, last_heartbeat in self.client_heartbeats.items():
+                    time_since_heartbeat = (now - last_heartbeat).total_seconds()
+                    
+                    if time_since_heartbeat > self.heartbeat_timeout:
+                        stale_clients.append(client_id)
+                        logger.warning(f"Client {client_id} heartbeat timeout: {time_since_heartbeat}s")
+                
+                # Disconnect stale clients
+                for client_id in stale_clients:
+                    self.disconnect(client_id)
+                
+                # Wait before next check
+                await asyncio.sleep(self.heartbeat_interval)
+                
+            except Exception as e:
+                logger.error(f"Error in heartbeat monitor: {e}")
+                await asyncio.sleep(5)  # Brief pause before retrying
 
 
 # Global connection manager instance
@@ -714,12 +421,16 @@ async def websocket_endpoint(websocket: WebSocket):
                     client_message = json.loads(data)
                     await manager.handle_client_message(websocket, client_id, client_message)
                 except json.JSONDecodeError:
-                    error_msg = await manager.message_handler.create_error_message(
-                        "INVALID_JSON",
-                        "Invalid JSON format",
-                        None,
-                        "error"
-                    )
+                    error_msg = {
+                        "messageType": "error",
+                        "version": "1.0",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "data": {
+                            "errorCode": "INVALID_JSON",
+                            "errorMessage": "Invalid JSON format",
+                            "severity": "error"
+                        }
+                    }
                     await manager.send_personal_message(websocket, error_msg)
                 
             except WebSocketDisconnect:
@@ -727,20 +438,21 @@ async def websocket_endpoint(websocket: WebSocket):
             
             except Exception as e:
                 logger.error(f"WebSocket error for client {client_id}: {e}")
-                error_msg = await manager.message_handler.create_error_message(
-                    "INTERNAL_ERROR",
-                    "Internal server error",
-                    None,
-                    "critical"
-                )
+                error_msg = {
+                    "messageType": "error",
+                    "version": "1.0",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "data": {
+                        "errorCode": "INTERNAL_ERROR",
+                        "errorMessage": "Internal server error",
+                        "severity": "critical"
+                    }
+                }
                 await manager.send_personal_message(websocket, error_msg)
                 break
     
     finally:
         manager.disconnect(client_id)
-
-
-# Legacy handle_client_message function removed - now handled by ConnectionManager.handle_client_message
 
 
 # Export manager for use by other services
@@ -762,4 +474,8 @@ def get_websocket_performance_metrics() -> Dict[str, Any]:
     Returns:
         Dictionary containing connection and message processing metrics.
     """
-    return manager.get_performance_metrics()
+    return {
+        "total_connections": len(manager.active_connections),
+        "messages_sent": manager.performance_metrics["messages_sent"],
+        "connection_health": manager.get_connection_health_status() if hasattr(manager, 'get_connection_health_status') else {}
+    }

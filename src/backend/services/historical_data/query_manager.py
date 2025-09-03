@@ -408,7 +408,7 @@ class HistoricalDataQueryManager:
             "min_date_range_days": 1,  # Minimum 1 day
             "max_records": 10000,  # Maximum records per request
             "valid_frequencies": [f.value for f in DataFrequency],
-            "symbol_pattern": re.compile(r"^[A-Z0-9\.\-]{1,10}$"),  # Valid symbol format
+            "symbol_pattern": re.compile(r"^[A-Z0-9\.\-\/$]{1,10}$"),  # Valid symbol format (includes / for futures and $ for indices)
             "max_query_name_length": 100,
             "max_description_length": 500
         }

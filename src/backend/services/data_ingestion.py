@@ -34,17 +34,40 @@ class DataNormalizer:
     @staticmethod
     def normalize_tick_data(symbol: str, raw_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
-        Normalize raw tick data from Schwab API.
+        Normalize raw tick data from Schwab API via schwab-package.
         
         Args:
             symbol: Instrument symbol.
-            raw_data: Raw data from Schwab API.
+            raw_data: Raw data from schwab-package (nested structure with 'content' array).
         
         Returns:
             Optional[Dict]: Normalized tick data or None if invalid.
         """
         try:
-            # Extract common fields (adapt based on actual Schwab API response format)
+            # Log the raw data for debugging
+            logger.debug(f"Normalizing data for {symbol}: {raw_data}")
+            
+            # Extract market data from schwab-package structure
+            # Data comes as: {'service': '...', 'content': [{'key': symbol, 'FIELD': value, ...}]}
+            content = raw_data.get('content', [])
+            if not content:
+                logger.warning(f"No content in data for {symbol}: {raw_data}")
+                return None
+            
+            # Find the data for our symbol in the content array
+            market_data = None
+            for item in content:
+                if item.get('key') == symbol:
+                    market_data = item
+                    break
+            
+            if not market_data:
+                logger.warning(f"Symbol {symbol} not found in content: {content}")
+                return None
+            
+            logger.debug(f"Found market data for {symbol}: {market_data}")
+            
+            # Extract common fields (adapted for Schwab schwab-package format)
             normalized = {
                 "symbol": symbol.upper(),
                 "timestamp": datetime.utcnow(),  # Use server time for now
@@ -59,49 +82,88 @@ class DataNormalizer:
                 "low_price": None,
             }
             
-            # Map Schwab fields to normalized fields
-            # Note: Field mapping will need to be adjusted based on actual Schwab API response
+            # Map Schwab schwab-package fields to normalized fields
+            # Based on actual streaming data structure from schwab-package
             field_mapping = {
-                "last": "price",
+                # Price fields
+                "LAST_PRICE": "price",
                 "lastPrice": "price",
+                "last": "price",
                 "price": "price",
+                
+                # Volume fields
+                "TOTAL_VOLUME": "volume", 
                 "volume": "volume",
                 "vol": "volume",
+                
+                # Bid/Ask fields
+                "BID_PRICE": "bid",
                 "bid": "bid",
                 "bidPrice": "bid",
-                "ask": "ask",
+                "ASK_PRICE": "ask",
+                "ask": "ask", 
                 "askPrice": "ask",
+                
+                # Size fields
+                "BID_SIZE": "bid_size",
                 "bidSize": "bid_size",
+                "ASK_SIZE": "ask_size",
                 "askSize": "ask_size",
+                
+                # OHLC fields
+                "OPEN_PRICE": "open_price",
                 "open": "open_price",
                 "openPrice": "open_price",
+                "HIGH_PRICE": "high_price", 
                 "high": "high_price",
                 "highPrice": "high_price",
-                "low": "low_price",
+                "LOW_PRICE": "low_price",
+                "low": "low_price", 
                 "lowPrice": "low_price",
             }
             
             # Apply field mapping
             for schwab_field, normalized_field in field_mapping.items():
-                if schwab_field in raw_data:
-                    value = raw_data[schwab_field]
+                if schwab_field in market_data:
+                    value = market_data[schwab_field]
                     if value is not None:
-                        normalized[normalized_field] = float(value)
+                        try:
+                            normalized[normalized_field] = float(value)
+                        except (ValueError, TypeError):
+                            logger.warning(f"Could not convert {schwab_field}={value} to float for {symbol}")
+            
+            # For symbols without LAST_PRICE, use BID_PRICE or ASK_PRICE as fallback
+            if normalized["price"] is None:
+                if normalized["bid"] is not None and normalized["ask"] is not None:
+                    # Use mid-price as fallback
+                    normalized["price"] = (normalized["bid"] + normalized["ask"]) / 2.0
+                    logger.debug(f"Using mid-price {normalized['price']} for {symbol}")
+                elif normalized["bid"] is not None:
+                    normalized["price"] = normalized["bid"]
+                    logger.debug(f"Using bid price {normalized['price']} for {symbol}")
+                elif normalized["ask"] is not None:
+                    normalized["price"] = normalized["ask"]
+                    logger.debug(f"Using ask price {normalized['price']} for {symbol}")
             
             # Validate required fields
             if normalized["price"] is None:
-                logger.warning(f"No price data for {symbol}, skipping tick")
+                logger.warning(f"No price data available for {symbol} in {market_data}, skipping tick")
                 return None
             
             # Validate price range (basic sanity check)
             if normalized["price"] <= 0 or normalized["price"] > 1000000:
                 logger.warning(f"Invalid price {normalized['price']} for {symbol}")
                 return None
+                
+            # Set default volume if not provided
+            if normalized["volume"] is None:
+                normalized["volume"] = 0
             
+            logger.info(f"✅ Successfully normalized data for {symbol}: price={normalized['price']}, volume={normalized['volume']}, bid={normalized['bid']}, ask={normalized['ask']}")
             return normalized
             
         except (ValueError, TypeError, KeyError) as e:
-            logger.warning(f"Failed to normalize data for {symbol}: {e}")
+            logger.error(f"Failed to normalize data for {symbol}: {e}")
             return None
 
 
@@ -160,8 +222,8 @@ class DataIngestionService:
             # Set up Schwab client callback
             self.schwab_client.set_data_callback(self._handle_market_data)
             
-            # Get target symbols for streaming
-            target_symbols = get_all_instruments()
+            # Get target symbols from database (not config)
+            target_symbols = list(self.instruments_map.keys())
             
             # Start Schwab streaming
             if await self.schwab_client.start_streaming(target_symbols):
@@ -170,7 +232,7 @@ class DataIngestionService:
                 asyncio.create_task(self._data_processing_loop())
                 asyncio.create_task(self._connection_monitor())
                 
-                logger.info(f"Data ingestion service started for {len(target_symbols)} instruments")
+                logger.info(f"Data ingestion service started for {len(target_symbols)} instruments: {target_symbols}")
             else:
                 raise SchwabAPIError("Failed to start Schwab streaming")
                 
@@ -219,15 +281,17 @@ class DataIngestionService:
         
         logger.info(f"Loaded {len(self.instruments_map)} instrument mappings")
     
-    async def _handle_market_data(self, symbol: str, raw_data: Dict[str, Any]) -> None:
+    def _handle_market_data(self, symbol: str, raw_data: Dict[str, Any]) -> None:
         """
-        Handle incoming market data from Schwab API.
+        Handle incoming market data from Schwab API (synchronous callback).
         
         Args:
             symbol: Instrument symbol.
             raw_data: Raw market data from API.
         """
         try:
+            logger.info(f"📈 MARKET DATA CALLBACK: {symbol} - processing data")
+            
             # Normalize data
             normalized_data = self.normalizer.normalize_tick_data(symbol, raw_data)
             if not normalized_data:
@@ -236,6 +300,7 @@ class DataIngestionService:
             # Add to processing queue (non-blocking)
             try:
                 self.data_queue.put_nowait(normalized_data)
+                logger.info(f"📥 QUEUED: {symbol} - normalized data added to queue")
             except asyncio.QueueFull:
                 logger.warning("Data queue full, dropping tick data")
                 
@@ -290,6 +355,8 @@ class DataIngestionService:
             session: Database session.
             batch_data: List of normalized tick data.
         """
+        logger.info(f"🔄 PROCESSING BATCH: {len(batch_data)} items")
+        
         # Create MarketData records
         market_data_records = []
         
@@ -335,6 +402,7 @@ class DataIngestionService:
         
         # Broadcast tick updates via WebSocket and trigger alert evaluation
         for record in market_data_records:
+            logger.info(f"📡 BROADCASTING: {batch_data[market_data_records.index(record)]['symbol']} @ {record.price}")
             await self.websocket_manager.broadcast_tick_update(
             instrument_id=record.instrument_id,
                 symbol=batch_data[market_data_records.index(record)]["symbol"],
@@ -348,7 +416,7 @@ class DataIngestionService:
                 await self.alert_engine.queue_evaluation(record.instrument_id, record)
         
         if len(market_data_records) > 0:
-            logger.debug(f"Processed batch of {len(market_data_records)} market data records")
+            logger.info(f"✅ BATCH COMPLETE: Processed {len(market_data_records)} market data records")
     
     async def _connection_monitor(self) -> None:
         """
@@ -360,11 +428,11 @@ class DataIngestionService:
             try:
                 await asyncio.sleep(check_interval)
                 
-                if not self.schwab_client.market_client.is_connected:
+                if not self.schwab_client.is_connected:
                     logger.warning("Schwab connection lost, attempting reconnection")
                     
                     # Attempt reconnection
-                    if await self.schwab_client.market_client.reconnect_with_backoff():
+                    if await self.schwab_client._client.reconnect_with_backoff():
                         logger.info("Successfully reconnected to Schwab API")
                     else:
                         logger.error("Failed to reconnect to Schwab API")
@@ -400,7 +468,7 @@ class DataIngestionService:
         """
         return {
             "running": self.is_running,
-            "connected": self.schwab_client.market_client.is_connected,
+            "connected": self.schwab_client.is_connected,
             "ticks_processed": self.ticks_processed,
             "last_tick_time": self.last_tick_time.isoformat() if self.last_tick_time else None,
             "processing_errors": self.processing_errors,
